@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useGames } from "../context/GameContext";
-import { gameService } from "../services/gameService";
+import { exportToFile, importFromFile } from "../services/gameService";
 import { FaDownload, FaUpload, FaInfoCircle } from "react-icons/fa";
 import "../styles/DataManager.css";
 
@@ -11,7 +11,7 @@ const DataManager = () => {
   // 📥 EXPORT - Download als JSON
   const handleExport = () => {
     try {
-      gameService.exportToFile();
+      exportToFile();
       alert(
         `✅ Backup erfolgreich erstellt!\n\n` +
           `${games.length} Spiele wurden exportiert.\n\n` +
@@ -42,7 +42,7 @@ const DataManager = () => {
 
     setImporting(true);
     try {
-      const importedGames = await gameService.importFromFile(file);
+      const importedGames = await importFromFile(file);
       await refreshGames();
 
       alert(
@@ -70,7 +70,7 @@ const DataManager = () => {
     if (!confirm) return;
 
     try {
-      await gameService.resetToDefault();
+      await resetToDefault();
       await refreshGames();
       alert("✅ App wurde zurückgesetzt!");
     } catch (error) {

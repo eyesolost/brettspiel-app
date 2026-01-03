@@ -30,19 +30,47 @@ const GameForm = ({ mode = 'add' }) => {
     info: '',
     komplexitaet: 3,
     rohrstrat: '',
-    bggRating: 7.0,
+    bgg_rating: 7.0,
     optimaleSpieleranzahl: ''
   });
 
   const [erweiterungInput, setErweiterungInput] = useState('');
   const [anschaffungInput, setAnschaffungInput] = useState('');
 
+  const reverseTransformFormData = (data) => {
+    // Transform database schema back to form data
+    const transformed = { ...data };
+    
+    // Combine min_spieler and max_spieler into minMaxSpieler
+    if (data.min_spieler || data.max_spieler) {
+      transformed.minMaxSpieler = `${data.min_spieler || ''}-${data.max_spieler || ''}`;
+    }
+    delete transformed.min_spieler;
+    delete transformed.max_spieler;
+    
+    // Combine min_spielzeit and max_spielzeit into minMaxSpielzeit
+    if (data.min_spielzeit || data.max_spielzeit) {
+      transformed.minMaxSpielzeit = `${data.min_spielzeit || ''}-${data.max_spielzeit || ''}`;
+    }
+    delete transformed.min_spielzeit;
+    delete transformed.max_spielzeit;
+    
+    // Rename optimale_spieleranzahl to optimaleSpieleranzahl
+    if (data.optimale_spieleranzahl) {
+      transformed.optimaleSpieleranzahl = data.optimale_spieleranzahl;
+    }
+    delete transformed.optimale_spieleranzahl;
+    
+    return transformed;
+  };
+
   useEffect(() => {
     if (mode === 'edit' && id) {
       const game = getGameById(id);
       if (game) {
+        const formattedGame = reverseTransformFormData(game);
         setFormData({
-          ...game,
+          ...formattedGame,
           erweiterungenInBesitz: game.erweiterungenInBesitz || [],
           erweiterungenZurAnschaffung: game.erweiterungenZurAnschaffung || []
         });
@@ -84,14 +112,91 @@ const GameForm = ({ mode = 'add' }) => {
     });
   };
 
+  const transformFormData = (data) => {
+    const transformed = {};
+    
+    // List of numeric fields that should not be empty strings
+    const numericFields = [
+      'min_spieler', 'max_spieler', 'optimale_spieleranzahl',
+      'min_spielzeit', 'max_spielzeit',
+      'spass', 'strategie', 'glueck', 'komplexitaet', 'bgg_rating',
+      'altersempfehlung', 'rohrstrat'
+    ];
+    
+    // Copy all fields from data
+    Object.keys(data).forEach(key => {
+      transformed[key] = data[key];
+    });
+    
+    // Split minMaxSpieler into min_spieler and max_spieler
+    if (data.minMaxSpieler && data.minMaxSpieler.trim()) {
+      const parts = data.minMaxSpieler.split('-').map(v => {
+        const num = parseInt(v.trim());
+        return isNaN(num) ? null : num;
+      });
+      transformed.min_spieler = parts[0];
+      transformed.max_spieler = parts[1];
+    } else {
+      delete transformed.min_spieler;
+      delete transformed.max_spieler;
+    }
+    delete transformed.minMaxSpieler;
+    
+    // Split minMaxSpielzeit into min_spielzeit and max_spielzeit
+    if (data.minMaxSpielzeit && data.minMaxSpielzeit.trim()) {
+      const parts = data.minMaxSpielzeit.split('-').map(v => {
+        const num = parseInt(v.trim());
+        return isNaN(num) ? null : num;
+      });
+      transformed.min_spielzeit = parts[0];
+      transformed.max_spielzeit = parts[1];
+    } else {
+      delete transformed.min_spielzeit;
+      delete transformed.max_spielzeit;
+    }
+    delete transformed.minMaxSpielzeit;
+    
+    // Rename optimaleSpieleranzahl to optimale_spieleranzahl
+    if (data.optimaleSpieleranzahl && data.optimaleSpieleranzahl.trim()) {
+      const num = parseInt(data.optimaleSpieleranzahl);
+      transformed.optimale_spieleranzahl = isNaN(num) ? null : num;
+    } else {
+      delete transformed.optimale_spieleranzahl;
+    }
+    delete transformed.optimaleSpieleranzahl;
+    
+    // Ensure all numeric fields are valid numbers, not empty strings
+    // If a field is empty/null, remove it completely so the database uses its default
+    numericFields.forEach(field => {
+      const value = transformed[field];
+      if (value === '' || value === null || value === undefined) {
+        delete transformed[field];
+      } else if (typeof value === 'string') {
+        const num = parseInt(value);
+        if (isNaN(num)) {
+          delete transformed[field];
+        } else {
+          transformed[field] = num;
+        }
+      }
+    });
+    
+    // Remove fields that don't exist in the database
+    delete transformed.spieler;
+    
+    return transformed;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     try {
+      const transformedData = transformFormData(formData);
+      
       if (mode === 'edit') {
-        await updateGame(id, formData);
+        await updateGame(id, transformedData);
       } else {
-        await addGame(formData);
+        await addGame(transformedData);
       }
       navigate('/');
     } catch (error) {
@@ -276,12 +381,12 @@ const GameForm = ({ mode = 'add' }) => {
             </div>
 
             <div className="form-group">
-              <label htmlFor="bggRating">BGG-Rating (1-10)</label>
+              <label htmlFor="bgg_rating">BGG-Rating (1-10)</label>
               <input
                 type="number"
-                id="bggRating"
-                name="bggRating"
-                value={formData.bggRating}
+                id="bgg_rating"
+                name="bgg_rating"
+                value={formData.bgg_rating}
                 onChange={handleChange}
                 min="1"
                 max="10"

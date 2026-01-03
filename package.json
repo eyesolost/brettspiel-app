@@ -1,19 +1,23 @@
 {
   "name": "brettspiel-app",
-  "private": true,
-  "version": "0.0.0",
+  "private": true,  
+  "description": "Brettspiel-Verwaltungs-App mit Supabase Backend",
+  "version": "2.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
+    "supabase:types": "supabase gen types typescript --project-id YOUR_PROJECT_ID > src/types/supabase.ts",
+    "supabase:migrate": "node -e \"import('./src/utils/migrateToSupabase.js').then(m => m.migrateFromLocalStorage())\""
   },
   "dependencies": {
     "@capacitor/android": "^8.0.0",
     "@capacitor/cli": "^8.0.0",
     "@capacitor/core": "^8.0.0",
     "@capacitor/ios": "^8.0.0",
+    "@supabase/supabase-js": "^2.89.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-icons": "^5.5.0",

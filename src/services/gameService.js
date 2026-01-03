@@ -1,238 +1,593 @@
-import initialGamesData from "../data/gamesData.json";
+// src/services/gamesService.js
+// Hybrid Games Service - Supabase Backend mit allen Features vom alten Service
+import { supabase } from '../lib/supabaseClient'
 
-const STORAGE_KEY = "brettspiel_sammlung";
-
-class GameService {
-  constructor() {
-    this.initializeStorage();
-  }
-
-  initializeStorage() {
-    const existingData = localStorage.getItem(STORAGE_KEY);
-    if (!existingData) {
-      // Erste Initialisierung mit Beispieldaten
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(initialGamesData));
-    }
-  }
-
-  getAllGames() {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const data = localStorage.getItem(STORAGE_KEY);
-        const games = data ? JSON.parse(data) : [];
-        resolve(games);
-      }, 100); // Simuliert asynchronen Aufruf
-    });
-  }
-
-  getGameById(id) {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        const data = localStorage.getItem(STORAGE_KEY);
-        const games = data ? JSON.parse(data) : [];
-        const game = games.find((g) => g.id === parseInt(id));
-
-        if (game) {
-          resolve(game);
-        } else {
-          reject(new Error("Spiel nicht gefunden"));
-        }
-      }, 50);
-    });
-  }
-
-  createGame(gameData, forceCreate = false) {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        const data = localStorage.getItem(STORAGE_KEY);
-        const games = data ? JSON.parse(data) : [];
-
-        let duplicateReason = null;
-        let existingGame = null;
-
-        // 🔍 Nur prüfen wenn NICHT forceCreate
-        if (!forceCreate) {
-          // 1. BGG-ID identisch (eindeutig!)
-          if (gameData.bggId) {
-            const bggDuplicate = games.find((g) => g.bggId === gameData.bggId);
-            if (bggDuplicate) {
-              existingGame = bggDuplicate;
-              duplicateReason = "BGG_ID_MATCH";
-            }
-          }
-
-          // 2. Exakte Übereinstimmung (Titel + Autor + Verlag)
-          if (!existingGame) {
-            existingGame = games.find(
-              (g) =>
-                g.titel.toLowerCase() === gameData.titel.toLowerCase() &&
-                g.autor?.toLowerCase() === gameData.autor?.toLowerCase() &&
-                g.verlag?.toLowerCase() === gameData.verlag?.toLowerCase()
-            );
-            if (existingGame) duplicateReason = "EXACT_MATCH";
-          }
-
-          // 3. Gleicher Titel + Autor (verschiedener Verlag/Edition)
-          if (!existingGame) {
-            existingGame = games.find(
-              (g) =>
-                g.titel.toLowerCase() === gameData.titel.toLowerCase() &&
-                g.autor?.toLowerCase() === gameData.autor?.toLowerCase()
-            );
-            if (existingGame) duplicateReason = "DIFFERENT_EDITION";
-          }
-
-          // 4. Nur gleicher Titel (könnte anderes Spiel sein)
-          if (!existingGame) {
-            existingGame = games.find(
-              (g) => g.titel.toLowerCase() === gameData.titel.toLowerCase()
-            );
-            if (existingGame) duplicateReason = "SAME_TITLE";
-          }
-        }
-
-        // Duplikat gefunden → Error werfen
-        if (existingGame && !forceCreate) {
-          const error = new Error("DUPLICATE_FOUND");
-          error.duplicate = true;
-          error.reason = duplicateReason;
-          error.existingGame = existingGame;
-          error.gameData = gameData;
-          reject(error);
-          return;
-        }
-
-        // Generiere neue ID
-        const maxId =
-          games.length > 0 ? Math.max(...games.map((g) => g.id)) : 0;
-        const newGame = {
-          ...gameData,
-          id: maxId + 1,
-        };
-
-        games.push(newGame);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(games));
-        resolve(newGame);
-      }, 100);
-    });
-  }
-
-  updateGame(id, gameData) {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        const data = localStorage.getItem(STORAGE_KEY);
-        const games = data ? JSON.parse(data) : [];
-
-        const index = games.findIndex((g) => g.id === parseInt(id));
-
-        if (index !== -1) {
-          games[index] = { ...gameData, id: parseInt(id) };
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(games));
-          resolve(games[index]);
-        } else {
-          reject(new Error("Spiel nicht gefunden"));
-        }
-      }, 100);
-    });
-  }
-
-  deleteGame(id) {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const data = localStorage.getItem(STORAGE_KEY);
-        const games = data ? JSON.parse(data) : [];
-
-        const filteredGames = games.filter((g) => g.id !== parseInt(id));
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(filteredGames));
-        resolve();
-      }, 100);
-    });
-  }
-
-  // Zusätzliche Hilfsfunktionen
-  exportGames() {
-    const data = localStorage.getItem(STORAGE_KEY);
-    return data ? JSON.parse(data) : [];
-  }
-
-  importGames(gamesArray) {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(gamesArray));
-        resolve(gamesArray);
-      }, 100);
-    });
-  }
-
- /**
- * Exportiert alle Spiele als JSON-Download
+/**
+ * Games Service - CRUD mit Duplikatserkennung, Export/Import, etc.
  */
-exportToFile() {
-  const games = this.exportGames();
-  const dataStr = JSON.stringify(games, null, 2);
-  const dataBlob = new Blob([dataStr], { type: 'application/json' });
-  
-  // Erstelle Download-Link
-  const url = URL.createObjectURL(dataBlob);
-  const link = document.createElement('a');
-  link.href = url;
-  
-  // Dateiname mit aktuellem Datum
-  const today = new Date().toISOString().split('T')[0];
-  link.download = `brettspiele_backup_${today}.json`;
-  
-  // Trigger Download
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+
+// ============================================
+// CREATE
+// ============================================
+
+/**
+ * Create a new game with duplicate detection
+ * @param {Object} gameData - Game data
+ * @param {boolean} forceCreate - Skip duplicate check
+ * @returns {Promise<Object>} Created game
+ */
+export const createGame = async (gameData, forceCreate = false) => {
+  try {
+    const { erweiterungenInBesitz, erweiterungenZurAnschaffung, ...gameFields } = gameData
+    
+    // 🔍 Duplikatserkennung (nur wenn nicht forceCreate)
+    if (!forceCreate) {
+      const duplicateCheck = await checkForDuplicates(gameData)
+      
+      if (duplicateCheck.found) {
+        const error = new Error('DUPLICATE_FOUND')
+        error.duplicate = true
+        error.reason = duplicateCheck.reason
+        error.existingGame = duplicateCheck.existingGame
+        error.gameData = gameData
+        throw error
+      }
+    }
+
+    // Insert game
+    const insertResponse = await supabase
+      .from('games')
+      .insert([gameFields])
+      .select()
+
+    const { data: insertedGames, error: gameError } = insertResponse
+
+    if (gameError) throw gameError
+    
+    if (!insertedGames || insertedGames.length === 0) {
+      throw new Error('Insert erfolgreich aber kein Datensatz zurückgegeben');
+    }
+    
+    const game = insertedGames[0];
+
+    // Insert extensions
+    if (erweiterungenInBesitz?.length > 0) {
+      await createExtensions(game.id, erweiterungenInBesitz, 'in_besitz')
+    }
+
+    if (erweiterungenZurAnschaffung?.length > 0) {
+      await createExtensions(game.id, erweiterungenZurAnschaffung, 'zur_anschaffung')
+    }
+
+    return await getGameById(game.id)
+  } catch (error) {
+    console.error('Error creating game:', error)
+    throw error
+  }
 }
 
 /**
- * Importiert Spiele aus JSON-Datei
+ * Check for duplicate games
+ * @param {Object} gameData - Game to check
+ * @returns {Promise<Object>} { found: boolean, reason: string, existingGame: Object }
  */
-importFromFile(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    
-    reader.onload = (e) => {
-      try {
-        const games = JSON.parse(e.target.result);
-        
-        // Validierung
-        if (!Array.isArray(games)) {
-          throw new Error('Datei enthält kein gültiges Spiele-Array');
-        }
-        
-        // Prüfe ob Spiele das richtige Format haben
-        if (games.length > 0 && !games[0].titel) {
-          throw new Error('Ungültiges Spiele-Format');
-        }
-        
-        // Speichere importierte Daten
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(games));
-        resolve(games);
-      } catch (error) {
-        reject(new Error('Fehler beim Lesen der Datei: ' + error.message));
-      }
-    };
-    
-    reader.onerror = () => {
-      reject(new Error('Fehler beim Lesen der Datei'));
-    };
-    
-    reader.readAsText(file);
-  });
-}
+const checkForDuplicates = async (gameData) => {
+  try {
+    const { data: allGames, error } = await supabase
+      .from('games')
+      .select('*')
 
-  resetToDefault() {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(initialGamesData));
-        resolve(initialGamesData);
-      }, 100);
-    });
+    if (error) throw error
+
+    let existingGame = null
+    let duplicateReason = null
+
+    // 1. BGG-ID identisch (eindeutig!)
+    if (gameData.bgg_id) {
+      existingGame = allGames.find(g => g.bgg_id === gameData.bgg_id)
+      if (existingGame) {
+        duplicateReason = 'BGG_ID_MATCH'
+        return { found: true, reason: duplicateReason, existingGame }
+      }
+    }
+
+    // 2. Exakte Übereinstimmung (Titel + Autor + Verlag)
+    existingGame = allGames.find(g =>
+      g.titel?.toLowerCase() === gameData.titel?.toLowerCase() &&
+      g.autor?.toLowerCase() === gameData.autor?.toLowerCase() &&
+      g.verlag?.toLowerCase() === gameData.verlag?.toLowerCase()
+    )
+    if (existingGame) {
+      duplicateReason = 'EXACT_MATCH'
+      return { found: true, reason: duplicateReason, existingGame }
+    }
+
+    // 3. Gleicher Titel + Autor (verschiedener Verlag/Edition)
+    existingGame = allGames.find(g =>
+      g.titel?.toLowerCase() === gameData.titel?.toLowerCase() &&
+      g.autor?.toLowerCase() === gameData.autor?.toLowerCase()
+    )
+    if (existingGame) {
+      duplicateReason = 'DIFFERENT_EDITION'
+      return { found: true, reason: duplicateReason, existingGame }
+    }
+
+    // 4. Nur gleicher Titel (könnte anderes Spiel sein)
+    existingGame = allGames.find(g =>
+      g.titel?.toLowerCase() === gameData.titel?.toLowerCase()
+    )
+    if (existingGame) {
+      duplicateReason = 'SAME_TITLE'
+      return { found: true, reason: duplicateReason, existingGame }
+    }
+
+    return { found: false, reason: null, existingGame: null }
+  } catch (error) {
+    console.error('Error checking duplicates:', error)
+    // Bei Fehler: Keine Duplikatsprüfung → durchlassen
+    return { found: false, reason: null, existingGame: null }
   }
 }
 
-export const gameService = new GameService();
+const createExtensions = async (gameId, extensionNames, type) => {
+  const extensions = extensionNames.map(name => ({
+    game_id: gameId,
+    name,
+    type
+  }))
+
+  const { error } = await supabase
+    .from('extensions')
+    .insert(extensions)
+
+  if (error) throw error
+}
+
+// ============================================
+// READ
+// ============================================
+
+/**
+ * Get all games
+ */
+export const getAllGames = async () => {
+  try {
+    const { data: games, error } = await supabase
+      .from('games')
+      .select(`
+        *,
+        extensions (
+          id,
+          name,
+          type
+        )
+      `)
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+
+    return games.map(game => transformGameFromDB(game))
+  } catch (error) {
+    console.error('Error fetching games:', error)
+    throw error
+  }
+}
+
+/**
+ * Get a single game by ID
+ */
+export const getGameById = async (id) => {
+  try {
+    const { data: game, error } = await supabase
+      .from('games')
+      .select(`
+        *,
+        extensions (
+          id,
+          name,
+          type
+        )
+      `)
+      .eq('id', id)
+      .single()
+
+    if (error) throw error
+
+    return transformGameFromDB(game)
+  } catch (error) {
+    console.error('Error fetching game:', error)
+    throw error
+  }
+}
+
+/**
+ * Search games by title
+ */
+export const searchGames = async (searchTerm) => {
+  try {
+    const { data: games, error } = await supabase
+      .from('games')
+      .select(`
+        *,
+        extensions (
+          id,
+          name,
+          type
+        )
+      `)
+      .ilike('titel', `%${searchTerm}%`)
+      .order('titel')
+
+    if (error) throw error
+
+    return games.map(game => transformGameFromDB(game))
+  } catch (error) {
+    console.error('Error searching games:', error)
+    throw error
+  }
+}
+
+/**
+ * Filter games by criteria
+ */
+export const filterGames = async (filters) => {
+  try {
+    let query = supabase
+      .from('games')
+      .select(`
+        *,
+        extensions (
+          id,
+          name,
+          type
+        )
+      `)
+
+    if (filters.minSpieler) {
+      query = query.gte('min_spieler', filters.minSpieler)
+    }
+    if (filters.maxSpieler) {
+      query = query.lte('max_spieler', filters.maxSpieler)
+    }
+    if (filters.minRating) {
+      query = query.gte('spass', filters.minRating)
+    }
+    if (filters.verlag) {
+      query = query.eq('verlag', filters.verlag)
+    }
+    if (filters.fehlteile !== undefined) {
+      query = query.eq('fehlteile', filters.fehlteile)
+    }
+
+    const { data: games, error } = await query.order('titel')
+
+    if (error) throw error
+
+    return games.map(game => transformGameFromDB(game))
+  } catch (error) {
+    console.error('Error filtering games:', error)
+    throw error
+  }
+}
+
+// ============================================
+// UPDATE
+// ============================================
+
+/**
+ * Update a game
+ */
+export const updateGame = async (id, updates) => {
+  try {
+    const { erweiterungenInBesitz, erweiterungenZurAnschaffung, ...gameUpdates } = updates
+
+    // Update game
+    const { data: game, error: gameError } = await supabase
+      .from('games')
+      .update(gameUpdates)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (gameError) throw gameError
+
+    // Update extensions if provided
+    if (erweiterungenInBesitz !== undefined || erweiterungenZurAnschaffung !== undefined) {
+      // Delete existing extensions
+      await supabase
+        .from('extensions')
+        .delete()
+        .eq('game_id', id)
+
+      // Insert new extensions
+      if (erweiterungenInBesitz?.length > 0) {
+        await createExtensions(id, erweiterungenInBesitz, 'in_besitz')
+      }
+      if (erweiterungenZurAnschaffung?.length > 0) {
+        await createExtensions(id, erweiterungenZurAnschaffung, 'zur_anschaffung')
+      }
+    }
+
+    return await getGameById(id)
+  } catch (error) {
+    console.error('Error updating game:', error)
+    throw error
+  }
+}
+
+// ============================================
+// DELETE
+// ============================================
+
+/**
+ * Delete a game
+ */
+export const deleteGame = async (id) => {
+  try {
+    const { error } = await supabase
+      .from('games')
+      .delete()
+      .eq('id', id)
+
+    if (error) throw error
+  } catch (error) {
+    console.error('Error deleting game:', error)
+    throw error
+  }
+}
+
+/**
+ * Delete multiple games
+ */
+export const deleteMultipleGames = async (ids) => {
+  try {
+    const { error } = await supabase
+      .from('games')
+      .delete()
+      .in('id', ids)
+
+    if (error) throw error
+  } catch (error) {
+    console.error('Error deleting games:', error)
+    throw error
+  }
+}
+
+// ============================================
+// IMPORT / EXPORT
+// ============================================
+
+/**
+ * Import games from array (z.B. aus JSON)
+ * @param {Array<Object>} gamesArray - Array of games to import
+ * @param {boolean} skipDuplicates - Skip duplicates instead of failing
+ * @returns {Promise<Object>} { success: Array, failed: Array, skipped: Array }
+ */
+export const importGames = async (gamesArray, skipDuplicates = true) => {
+  try {
+    const results = []
+    const errors = []
+    const skipped = []
+
+    for (const gameData of gamesArray) {
+      try {
+        // Transform old format to new format
+        const transformedGame = transformGameToSupabase(gameData)
+        
+        // Try to create
+        const game = await createGame(transformedGame, !skipDuplicates)
+        results.push(game)
+        
+        console.log(`✅ Imported: ${gameData.titel}`)
+      } catch (error) {
+        if (error.duplicate && skipDuplicates) {
+          // Skip duplicate
+          skipped.push({
+            game: gameData.titel,
+            reason: error.reason,
+            existingGame: error.existingGame
+          })
+          console.log(`⏭️  Skipped (duplicate): ${gameData.titel}`)
+        } else {
+          // Real error
+          errors.push({
+            game: gameData.titel,
+            error: error.message
+          })
+          console.error(`❌ Failed: ${gameData.titel}`, error)
+        }
+      }
+    }
+
+    const summary = {
+      success: results,
+      failed: errors,
+      skipped: skipped,
+      total: gamesArray.length,
+      imported: results.length,
+      failedCount: errors.length,
+      skippedCount: skipped.length
+    }
+
+    console.log('📊 Import Summary:', summary)
+    
+    return summary
+  } catch (error) {
+    console.error('Error importing games:', error)
+    throw error
+  }
+}
+
+/**
+ * Export all games to JSON
+ */
+export const exportGames = async () => {
+  try {
+    const games = await getAllGames()
+    return games
+  } catch (error) {
+    console.error('Error exporting games:', error)
+    throw error
+  }
+}
+
+/**
+ * Export games as file download
+ */
+export const exportToFile = async () => {
+  try {
+    const games = await exportGames()
+    const dataStr = JSON.stringify(games, null, 2)
+    const dataBlob = new Blob([dataStr], { type: 'application/json' })
+    
+    // Create download link
+    const url = URL.createObjectURL(dataBlob)
+    const link = document.createElement('a')
+    link.href = url
+    
+    // Filename with current date
+    const today = new Date().toISOString().split('T')[0]
+    link.download = `brettspiele_backup_${today}.json`
+    
+    // Trigger download
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+    
+    console.log('✅ Export successful:', link.download)
+  } catch (error) {
+    console.error('Error exporting to file:', error)
+    throw error
+  }
+}
+
+/**
+ * Import games from file
+ */
+export const importFromFile = async (file, skipDuplicates = true) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    
+    reader.onload = async (e) => {
+      try {
+        const games = JSON.parse(e.target.result)
+        
+        // Validation
+        if (!Array.isArray(games)) {
+          throw new Error('Datei enthält kein gültiges Spiele-Array')
+        }
+        
+        if (games.length > 0 && !games[0].titel) {
+          throw new Error('Ungültiges Spiele-Format')
+        }
+        
+        // Import to Supabase
+        const result = await importGames(games, skipDuplicates)
+        resolve(result)
+      } catch (error) {
+        reject(new Error('Fehler beim Lesen der Datei: ' + error.message))
+      }
+    }
+    
+    reader.onerror = () => {
+      reject(new Error('Fehler beim Lesen der Datei'))
+    }
+    
+    reader.readAsText(file)
+  })
+}
+
+// ============================================
+// STATISTICS
+// ============================================
+
+/**
+ * Get statistics about the game collection
+ */
+export const getStatistics = async () => {
+  try {
+    const { data: stats, error } = await supabase
+      .from('games')
+      .select('spass, strategie, glueck, fehlteile')
+
+    if (error) throw error
+
+    const totalGames = stats.length
+    const gamesWithMissingParts = stats.filter(g => g.fehlteile).length
+    const avgSpass = stats.reduce((sum, g) => sum + (g.spass || 0), 0) / totalGames
+    const avgStrategie = stats.reduce((sum, g) => sum + (g.strategie || 0), 0) / totalGames
+    const avgGlueck = stats.reduce((sum, g) => sum + (g.glueck || 0), 0) / totalGames
+
+    return {
+      totalGames,
+      gamesWithMissingParts,
+      avgSpass: avgSpass.toFixed(1),
+      avgStrategie: avgStrategie.toFixed(1),
+      avgGlueck: avgGlueck.toFixed(1)
+    }
+  } catch (error) {
+    console.error('Error fetching statistics:', error)
+    throw error
+  }
+}
+
+// ============================================
+// HELPERS
+// ============================================
+
+/**
+ * Transform game from DB to app format
+ */
+const transformGameFromDB = (game) => {
+  const { extensions, ...gameData } = game
+
+  return {
+    ...gameData,
+    erweiterungenInBesitz: extensions
+      ?.filter(ext => ext.type === 'in_besitz')
+      .map(ext => ext.name) || [],
+    erweiterungenZurAnschaffung: extensions
+      ?.filter(ext => ext.type === 'zur_anschaffung')
+      .map(ext => ext.name) || []
+  }
+}
+
+/**
+ * Transform game from old localStorage format to Supabase format
+ */
+const transformGameToSupabase = (oldGame) => {
+  return {
+    // Basic info - map old keys to new keys
+    titel: oldGame.titel,
+    verlag: oldGame.verlag,
+    autor: oldGame.autor,
+    bgg_id: oldGame.bggId || oldGame.bgg_id,
+    
+    // Player info
+    min_spieler: oldGame.minSpieler || oldGame.min_spieler,
+    max_spieler: oldGame.maxSpieler || oldGame.max_spieler,
+    optimale_spieleranzahl: oldGame.optimaleSpieleranzahl || oldGame.optimale_spieleranzahl,
+    
+    // Time info
+    min_spielzeit: oldGame.minSpielzeit || oldGame.min_spielzeit,
+    max_spielzeit: oldGame.maxSpielzeit || oldGame.max_spielzeit,
+    
+    // Ratings
+    spass: oldGame.spass,
+    strategie: oldGame.strategie,
+    glueck: oldGame.glueck,
+    komplexitaet: oldGame.komplexitaet,
+        
+    // Age & Awards
+    altersempfehlung: oldGame.altersempfehlung,
+    awards: oldGame.awards,
+    
+    // Status & Location
+    fehlteile: oldGame.fehlteile || false,
+            
+    // Extensions
+    erweiterungenInBesitz: oldGame.erweiterungenInBesitz || [],
+    erweiterungenZurAnschaffung: oldGame.erweiterungenZurAnschaffung || []
+  }
+}

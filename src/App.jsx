@@ -1,3 +1,7 @@
+// src/App.jsx - Beispiel mit Simple Password Auth
+import { AuthProvider, useAuth } from './context/SimpleAuthContext'
+import SimpleLogin from './components/Auth/SimpleLogin'
+import { useGames } from './hooks/useSimpleGames'
 import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { GameProvider } from "./context/GameContext";
@@ -7,8 +11,25 @@ import GameForm from "./components/GameForm";
 import BGGImport from "./components/BGGImport";
 import DataManager from "./components/DataManager";
 import "./styles/App.css";
-
 function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
+  )
+}
+
+function AppContent() {
+  const { isAuthenticated, loading: authLoading, logout } = useAuth()
+  const { games, loading, addGame, editGame, removeGame } = useGames()
+
+  // Show loading state while checking authentication
+  // Not Authenticated - Show Login
+  if (!isAuthenticated) {
+    return <SimpleLogin />
+  }
+
+  // Authenticated - Show App
   return (
     <GameProvider>
       <Router>
@@ -35,4 +56,15 @@ function App() {
   );
 }
 
-export default App;
+export default App
+
+{/*src/App.jsx - Beispiel mit Migration Tool
+import MigrationTool from './components/Migration/MigrationTool'
+
+function App() {
+  return <MigrationTool onComplete={() => {
+    // Nach Migration zur normalen App wechseln
+  }} />
+  
+}
+export default App*/}

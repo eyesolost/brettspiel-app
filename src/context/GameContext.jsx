@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
-import { gameService } from '../services/gameService';
+import { getAllGames, createGame, updateGame as updateGameService, deleteGame as deleteGameService } from '../services/gameService';
 
 const GameContext = createContext();
 
@@ -22,7 +22,7 @@ export const GameProvider = ({ children }) => {
   const loadGames = async () => {
     try {
       setLoading(true);
-      const loadedGames = await gameService.getAllGames();
+      const loadedGames = await getAllGames();
       setGames(loadedGames);
     } catch (error) {
       console.error('Fehler beim Laden der Spiele:', error);
@@ -33,7 +33,7 @@ export const GameProvider = ({ children }) => {
 
   const addGame = async (game) => {
     try {
-      const newGame = await gameService.createGame(game);
+      const newGame = await createGame(game);
       setGames([...games, newGame]);
       return newGame;
     } catch (error) {
@@ -87,7 +87,7 @@ export const GameProvider = ({ children }) => {
         if (userWillDoppelt) {
           // User will trotzdem hinzufügen → Mit forceCreate nochmal versuchen
           try {
-            const newGame = await gameService.createGame(error.gameData, true);
+            const newGame = await createGame(error.gameData, true);
             setGames([...games, newGame]);
             return newGame;
           } catch (err) {
@@ -108,7 +108,7 @@ export const GameProvider = ({ children }) => {
 
   const updateGame = async (id, updatedGame) => {
     try {
-      const updated = await gameService.updateGame(id, updatedGame);
+      const updated = await updateGameService(id, updatedGame);
       setGames(games.map(game => game.id === id ? updated : game));
       return updated;
     } catch (error) {
@@ -119,7 +119,7 @@ export const GameProvider = ({ children }) => {
 
   const deleteGame = async (id) => {
     try {
-      await gameService.deleteGame(id);
+      await deleteGameService(id);
       setGames(games.filter(game => game.id !== id));
     } catch (error) {
       console.error('Fehler beim Löschen des Spiels:', error);
@@ -128,7 +128,7 @@ export const GameProvider = ({ children }) => {
   };
 
   const getGameById = (id) => {
-    return games.find(game => game.id === parseInt(id));
+    return games.find(game => game.id === id || game.id === String(id));
   };
 
   const value = {
