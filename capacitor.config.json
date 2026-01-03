@@ -1,0 +1,5 @@
+{
+  "appId": "de.brettspiele.app",
+  "appName": "brettspiel-app",
+  "webDir": "dist"
+}

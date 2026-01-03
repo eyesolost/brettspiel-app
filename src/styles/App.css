@@ -1,0 +1,186 @@
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.main-content {
+  flex: 1;
+  padding: 20px;
+  max-width: 1600px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.page-header {
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid var(--border-color);
+}
+
+.page-header h1 {
+  color: var(--text-color);
+  font-size: 32px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.game-count {
+  color: var(--text-secondary);
+  font-size: 16px;
+}
+
+.app-footer {
+  background-color: var(--card-background);
+  padding: 20px;
+  text-align: center;
+  border-top: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  margin-top: 40px;
+}
+
+.app-footer p {
+  margin: 0;
+}
+
+/* Buttons */
+.btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: var(--border-radius);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.3s ease;
+  text-decoration: none;
+}
+
+.btn:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-hover);
+}
+
+.btn-primary {
+  background-color: var(--primary-color);
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: var(--primary-dark);
+}
+
+.btn-secondary {
+  background-color: #6c757d;
+  color: white;
+}
+
+.btn-secondary:hover {
+  background-color: #5a6268;
+}
+
+.btn-icon {
+  padding: 8px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  font-size: 16px;
+}
+
+.btn-edit {
+  color: var(--primary-color);
+}
+
+.btn-edit:hover {
+  background-color: rgba(74, 144, 226, 0.1);
+}
+
+.btn-delete {
+  color: var(--danger-color);
+}
+
+.btn-delete:hover {
+  background-color: rgba(245, 34, 45, 0.1);
+}
+
+/* No Games Message */
+.no-games {
+  text-align: center;
+  padding: 60px 20px;
+  background-color: var(--card-background);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow);
+  margin-top: 20px;
+}
+
+.no-games p {
+  color: var(--text-secondary);
+  font-size: 18px;
+}
+
+/* Badges */
+.badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  margin-left: 8px;
+}
+
+.badge-warning {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.status-im-besitz {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.status-verkauft {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.status-verliehen {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+.status-bestellt {
+  background-color: #d1ecf1;
+  color: #0c5460;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .main-content {
+    padding: 10px;
+  }
+
+  .page-header h1 {
+    font-size: 24px;
+  }
+
+  .btn {
+    padding: 8px 16px;
+    font-size: 13px;
+  }
+}

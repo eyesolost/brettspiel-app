@@ -1,0 +1,35 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "chrome",
+      "request": "launch",
+      "name": "Chrome: Debug React App",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}/src",
+      "sourceMapPathOverrides": {
+        "webpack:///src/*": "${webRoot}/*"
+      },
+      "preLaunchTask": "npm: dev"
+    },
+    {
+      "type": "msedge",
+      "request": "launch",
+      "name": "Edge: Debug React App",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}/src",
+      "sourceMapPathOverrides": {
+        "webpack:///src/*": "${webRoot}/*"
+      },
+      "preLaunchTask": "npm: dev"
+    },
+    {
+      "type": "chrome",
+      "request": "attach",
+      "name": "Chrome: Attach (wenn App bereits läuft)",
+      "port": 9222,
+      "webRoot": "${workspaceFolder}/src",
+      "urlFilter": "http://localhost:5173/*"
+    }
+  ]
+}
