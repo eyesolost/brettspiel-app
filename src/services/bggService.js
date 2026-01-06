@@ -187,7 +187,7 @@ class BGGService {
         publishers: publishers.join(', '),
         
         // Bewertungen
-        bggRating: parseFloat(averageRating) || 0,
+        bgg_rating: parseFloat(averageRating) || 0,
         usersRated: parseInt(usersRated) || 0,
         complexity: parseFloat(averageWeight) || 0,
         rank: rank !== 'Not Ranked' ? parseInt(rank) : null,
@@ -223,35 +223,37 @@ class BGGService {
   /**
    * Importiere ein Spiel aus BGG in dein lokales Format
    * @param {number|string} gameId - BGG ID
-   * @returns {Promise<Object>} Spiel im lokalen Format
+   * @returns {Promise<Object>} Spiel im Datenbank-Format
    */
   async importGame(gameId) {
     const bggGame = await this.getGameDetails(gameId);
     
-    // Konvertiere BGG-Daten in dein lokales Spiel-Format
+    // Konvertiere BGG-Daten direkt ins Datenbank-Schema-Format
     return {
       titel: bggGame.name,
-      fehlteile: false,
-      minMaxSpieler: `${bggGame.minPlayers}-${bggGame.maxPlayers}`,
-      minMaxSpielzeit: `${bggGame.minPlaytime}-${bggGame.maxPlaytime}`,
-      spieler: '', // Manuell ergänzen
-      erweiterungenInBesitz: [],
-      erweiterungenZurAnschaffung: [],
-      strategie: Math.round(bggGame.complexity * 2), // 0-5 → 0-10
-      spass: Math.round(bggGame.bggRating), // 0-10
-      glueck: 5, // Default, manuell anpassen
-      altersempfehlung: bggGame.minAge,
-      awards: '', // Manuell ergänzen
       verlag: bggGame.publishers,
       autor: bggGame.designers,
-      standort: '', // Manuell ergänzen
-      anschaffungsdatum: new Date().toISOString().split('T')[0],
-      status: 'Im Besitz',
-      info: bggGame.description ? bggGame.description.substring(0, 200) + '...' : '',
+      bgg_id: parseInt(bggGame.id),
+      min_spieler: bggGame.minPlayers,
+      max_spieler: bggGame.maxPlayers,
+      optimale_spieleranzahl: bggGame.bestPlayerCount || null,
+      min_spielzeit: bggGame.minPlaytime,
+      max_spielzeit: bggGame.maxPlaytime,
+      spass: Math.round(bggGame.bgg_rating), // 0-10
+      strategie: Math.round(bggGame.complexity * 2), // 0-5 → 0-10
+      glueck: 5, // Default, manuell anpassen
       komplexitaet: Math.round(bggGame.complexity),
-      rohrstrat: this._complexityToRohrstrat(bggGame.complexity),
-      bggRating: parseFloat(bggGame.bggRating.toFixed(1)),
-      optimaleSpieleranzahl: bggGame.bestPlayerCount || `${bggGame.minPlayers}-${bggGame.maxPlayers}`
+      bgg_rating: parseFloat(bggGame.bgg_rating.toFixed(1)),
+      altersempfehlung: bggGame.minAge,
+      awards: '', // Manuell ergänzen
+      status: 'Im Besitz',
+      standort: '', // Manuell ergänzen
+      fehlteile: false,
+      anschaffungsdatum: new Date().toISOString().split('T')[0],
+      info: bggGame.description ? bggGame.description.substring(0, 200) + '...' : '',
+      rohrstrat: Math.round(bggGame.complexity), // Als Integer
+      erweiterungenInBesitz: [],
+      erweiterungenZurAnschaffung: []
     };
   }
 

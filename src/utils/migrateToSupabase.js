@@ -50,7 +50,7 @@ export const migrateFromLocalStorage = async () => {
       strategie: game.strategie,
       glueck: game.glueck,
       komplexitaet: game.komplexitaet,
-      bgg_rating: game.bggRating,
+      bgg_rating: game.bgg_Rating,
       altersempfehlung: game.altersempfehlung,
       awards: game.awards,
       status: game.status,
