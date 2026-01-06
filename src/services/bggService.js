@@ -9,6 +9,7 @@
 
 const BGG_API_BASE = 'https://boardgamegeek.com/xmlapi2';
 const REQUEST_DELAY = 5000; // 5 Sekunden zwischen Requests
+const BGGToken = import.meta.env.VITE_BGG_TOKEN || '';
 
 // Simple Queue für Rate Limiting
 class RequestQueue {
@@ -74,6 +75,22 @@ const getAttribute = (element, selector, attribute) => {
 
 class BGGService {
   /**
+   * Erstelle Fetch-Optionen mit Authorization Header
+   */
+  getRequestOptions() {
+    const options = {};
+    if (BGGToken) {
+      options.headers = {
+        'Authorization': `Bearer ${BGGToken}`
+      };
+      console.log('BGG Token wird gesendet:', BGGToken.substring(0, 10) + '...');
+    } else {
+      console.warn('⚠️ Kein BGG Token gefunden! Bitte VITE_BGG_TOKEN in .env.local setzen.');
+    }
+    return options;
+  }
+
+  /**
    * Suche nach Spielen
    * @param {string} query - Suchbegriff
    * @param {boolean} exact - Exakte Suche (optional)
@@ -81,8 +98,16 @@ class BGGService {
    */
   async searchGames(query, exact = false) {
     return requestQueue.add(async () => {
-      const url = `${BGG_API_BASE}/search?query=${encodeURIComponent(query)}&type=boardgame${exact ? '&exact=1' : ''}`;
-      const response = await fetch(url);
+      const url = `${BGG_API_BASE}/search?query=${encodeURIComponent(query)}&type=boardgame,boardgameexpansion,boardgameaccessory,rpgitem,videogame`;
+      const response = await fetch(url, this.getRequestOptions());
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('BGG API Error:', response.status, response.statusText);
+        console.error('Response:', errorText);
+        throw new Error(`BGG API returned ${response.status}: ${response.statusText}`);
+      }
+      
       const xmlText = await response.text();
       const xml = parseXML(xmlText);
 
@@ -104,7 +129,7 @@ class BGGService {
   async getGameDetails(gameId) {
     return requestQueue.add(async () => {
       const url = `${BGG_API_BASE}/thing?id=${gameId}&stats=1&videos=0`;
-      const response = await fetch(url);
+      const response = await fetch(url, this.getRequestOptions());
       const xmlText = await response.text();
       const xml = parseXML(xmlText);
 
@@ -180,7 +205,7 @@ class BGGService {
   async getHotGames() {
     return requestQueue.add(async () => {
       const url = `${BGG_API_BASE}/hot?type=boardgame`;
-      const response = await fetch(url);
+      const response = await fetch(url, this.getRequestOptions());
       const xmlText = await response.text();
       const xml = parseXML(xmlText);
 
