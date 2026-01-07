@@ -14,6 +14,7 @@ const BGGImport = () => {
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(null);
   const [error, setError] = useState('');
+  const [confirming, setConfirming] = useState(false);
   
   // Neuer State für Import-Dialog
   const [importDialog, setImportDialog] = useState(null);
@@ -80,6 +81,7 @@ const BGGImport = () => {
     if (!importDialog) return;
     
     try {
+      setConfirming(true);
       // Expansions: Bestimme Besitz/Zur Anschaffung anhand vorhandener Spiele
       const expansions = importDialog.bggData.expansions || [];
       const ownedById = expansions.filter(exp => games.some(g => g.bgg_id === parseInt(exp.id))).map(exp => exp.name);
@@ -120,17 +122,44 @@ const BGGImport = () => {
       });
       
       // Speichere in lokaler Datenbank (Extensions werden im Service eingefügt)
-      await addGame(finalGame);
-      
-      // Zeige Erfolgsmeldung
-      alert(`"${finalGame.titel}" wurde erfolgreich importiert!`);
-      
-      // Schließe Dialog und navigiere zur Übersicht
+      const created = await addGame(finalGame);
+
+      // Schließe Dialog zuerst, dann optional Feedback zeigen/navigieren
       setImportDialog(null);
-      navigate('/');
+
+      // Optional: kleines Delay, damit das Overlay sicher verschwindet
+      setTimeout(() => {
+        alert(`"${finalGame.titel}" wurde erfolgreich importiert!`);
+        navigate('/');
+      }, 0);
     } catch (err) {
-      setError('Fehler beim Speichern. Bitte versuche es erneut.');
       console.error('Save Error:', err);
+
+      // Falls User den Duplikat-Import abgebrochen hat: Dialog einfach schließen, kein Fehler anzeigen
+      if (err && err.message === 'Erstellung durch User abgebrochen') {
+        setImportDialog(null);
+        return;
+      }
+
+      // Heuristik: Prüfen, ob das Spiel trotz Error bereits in der Liste ist → als Erfolg behandeln
+      try {
+        const bggId = importDialog?.gameData?.bgg_id;
+        const title = (selectedTitle || '').toLowerCase();
+        const exists = games.some(g => (g.bgg_id && bggId && g.bgg_id === bggId) || (g.titel || '').toLowerCase() === title);
+        if (exists) {
+          setImportDialog(null);
+          setTimeout(() => {
+            alert(`"${selectedTitle}" wurde importiert.`);
+            navigate('/');
+          }, 0);
+          return;
+        }
+      } catch (_) {}
+
+      // Andernfalls echten Fehler anzeigen
+      setError('Fehler beim Speichern. Bitte versuche es erneut.');
+    } finally {
+      setConfirming(false);
     }
   };
 
@@ -376,8 +405,18 @@ const BGGImport = () => {
                 <button 
                   onClick={handleConfirmImport} 
                   className="btn btn-primary"
+                  disabled={confirming}
                 >
-                  <FaDownload /> Import bestätigen
+                  {confirming ? (
+                    <>
+                      <FaSpinner className="spinner-icon" />
+                      Speichern...
+                    </>
+                  ) : (
+                    <>
+                      <FaDownload /> Import bestätigen
+                    </>
+                  )}
                 </button>
               </div>
             </div>

@@ -173,109 +173,143 @@ const createExtensions = async (gameId, extensionNames, type) => {
 
 const createCategories = async (gameId, categoriesData) => {
   // categoriesData ist ein Array von Kategorien:
-  // - Vom User eingegeben: {name: "..."} oder {name: "...", name_de: "..."}
-  // - Von der DB (bestehend): {id: "uuid", name: "...", name_de: "...", bgg_id: 1014}
-  const { bggService } = await import('./bggService.js');
+  // - Aus BGGImport: {id: <BGG_ID (Integer)>, name: "...", name_de: "..."}
+  // - Aus GameForm Edit (bestehend): {id: <UUID>, name: "...", name_de: "...", bgg_id: <Integer>}
 
   for (const cat of categoriesData) {
     let categoryId;
     
-    // Wenn eine UUID vorhanden ist, ist es eine bestehende Kategorie
-    if (cat.id && cat.id.match(/^[0-9a-f-]{36}$/)) {
-      categoryId = cat.id;
-      console.log(`Using existing category: ${categoryId}`);
-    } else {
-      // Neue Kategorie vom User
-      let bgg_id = cat.bgg_id || null;
-      // Stelle sicher, dass bgg_id als Zahl gespeichert wird
-      if (typeof bgg_id === 'string') {
-        const parsed = parseInt(bgg_id, 10);
-        bgg_id = isNaN(parsed) ? null : parsed;
-      }
-      let name_de = cat.name_de || null;
-      let original_name = cat.original_name || null;
-      let display_name = cat.name || '';
+    // Neue Kategorie oder aus BGG Import
+    let bgg_id = cat.id || cat.bgg_id || null;
+    
+    // Stelle sicher, dass bgg_id als Integer gespeichert wird
+    if (typeof bgg_id === 'string') {
+      const parsed = parseInt(bgg_id, 10);
+      bgg_id = isNaN(parsed) ? null : parsed;
+    } else if (typeof bgg_id === 'number') {
+      bgg_id = parseInt(bgg_id, 10);
+    }
+    
+    let name_de = cat.name_de || null;
+    let original_name = cat.original_name || null;
+    let display_name = cat.name || '';
 
-      // Wenn keine bgg_id vorhanden, versuche BGG-Kategorie zu finden
-      if (!bgg_id && display_name) {
-        const bggMatch = await bggService.findBGGCategory(display_name);
-        if (bggMatch) {
-          bgg_id = bggMatch.id;
-          original_name = bggMatch.name; // Original Name von BGG
-          console.log(`Category matched: "${display_name}" -> BGG "${original_name}" (ID: ${bgg_id})`);
-        }
-      }
+    // 1. Wenn bgg_id vorhanden: Prüfe nach bgg_id in der Tabelle
+    if (bgg_id) {
+      const { data: existingList } = await supabase
+        .from('categories')
+        .select('id, name_de, original_name')
+        .eq('bgg_id', bgg_id)
+        .limit(1);
 
-      // 1. Prüfe ob Kategorie mit dieser bgg_id existiert
-      if (bgg_id) {
-        const { data: existing } = await supabase
+      const existing = Array.isArray(existingList) && existingList.length > 0 ? existingList[0] : null;
+      
+      if (existing) {
+        // Kategorie existiert bereits
+        categoryId = existing.id;
+        // Update name_de falls vorhanden und unterschiedlich
+        if (name_de && existing.name_de !== name_de) {
+          await supabase
             .from('categories')
-            .select('id, name_de, name, original_name')
-            .eq('bgg_id', bgg_id)
-            .single();
-
-        if (existing) {
-          categoryId = existing.id;
-          // Update name_de falls vorhanden und noch nicht gesetzt
-          if (name_de) {
-            await supabase
-              .from('categories')
-              .update({ name_de })
-              .eq('id', categoryId);
-          }
-          console.log(`Using existing BGG category: ${categoryId}`);
-        } else {
-          // Neue Kategorie mit bgg_id erstellen
-          const { data: newCat, error: catError } = await supabase
-            .from('categories')
-            .insert([{ 
-              name: name_de || display_name,
-              name_de,
-              original_name,
-              bgg_id 
-            }])
-            .select('id')
-            .single();
-
-          if (catError) throw catError;
-          categoryId = newCat.id;
-          console.log(`Created new category with bgg_id: ${categoryId}`);
+            .update({ name_de })
+            .eq('id', categoryId);
         }
+        console.log(`Using existing category by bgg_id (${bgg_id}): ${categoryId}`);
       } else {
-        // Keine bgg_id: Suche nach Name
-        const { data: existing } = await supabase
-          .from('categories')
-          .select('id')
-          .eq('name', display_name)
-          .single();
-
-        if (existing) {
-          categoryId = existing.id;
-          console.log(`Using existing custom category: ${categoryId}`);
-        } else {
-          // Neue Kategorie ohne bgg_id
-          const { data: newCat, error: catError } = await supabase
+        // Kategorie mit dieser bgg_id existiert nicht → erstelle sie
+        // Falls kein name_de, verwende englischen Namen als Fallback (kann später übersetzt werden)
+        try {
+          const { data: newCatArr, error: catError } = await supabase
             .from('categories')
-            .insert([{ 
-              name: display_name,
-              name_de 
+            .insert([{
+              name: name_de || display_name,
+              name_de: name_de || display_name,  // Fallback auf englischen Namen
+              original_name: original_name || display_name,
+              bgg_id
             }])
-            .select('id')
-            .single();
+            .select('id');
 
           if (catError) throw catError;
+          const newCat = Array.isArray(newCatArr) ? newCatArr[0] : newCatArr;
           categoryId = newCat.id;
-          console.log(`Created new custom category: ${categoryId}`);
+          console.log(`Created new category with bgg_id (${bgg_id}): ${categoryId}`);
+        } catch (insertError) {
+          // Unique constraint violation - Kategorie existiert bereits mit diesem Namen
+          if (insertError.code === '23505') {
+            // Suche nach existierender Kategorie mit diesem Namen
+            const { data: existingByName } = await supabase
+              .from('categories')
+              .select('id')
+              .eq('name', name_de || display_name)
+              .limit(1);
+            
+            if (existingByName && existingByName.length > 0) {
+              categoryId = existingByName[0].id;
+              console.log(`Using existing category by name after duplicate: ${categoryId}`);
+            } else {
+              throw insertError;
+            }
+          } else {
+            throw insertError;
+          }
+        }
+      }
+    } else {
+      // 2. Keine bgg_id: Prüfe nach Namen in der Tabelle
+      const { data: existingList } = await supabase
+        .from('categories')
+        .select('id')
+        .eq('name', display_name)
+        .limit(1);
+
+      const existing = Array.isArray(existingList) && existingList.length > 0 ? existingList[0] : null;
+
+      if (existing) {
+        categoryId = existing.id;
+        console.log(`Using existing category by name ("${display_name}"): ${categoryId}`);
+      } else {
+        // Kategorie existiert nicht → erstelle sie
+        try {
+          const { data: newCatArr, error: catError } = await supabase
+            .from('categories')
+            .insert([{
+              name: display_name,
+              name_de
+            }])
+            .select('id');
+
+          if (catError) throw catError;
+          const newCat = Array.isArray(newCatArr) ? newCatArr[0] : newCatArr;
+          categoryId = newCat.id;
+          console.log(`Created new category by name ("${display_name}"): ${categoryId}`);
+        } catch (insertError) {
+          // Unique constraint violation - Kategorie existiert bereits
+          if (insertError.code === '23505') {
+            const { data: existingByName } = await supabase
+              .from('categories')
+              .select('id')
+              .eq('name', display_name)
+              .limit(1);
+            
+            if (existingByName && existingByName.length > 0) {
+              categoryId = existingByName[0].id;
+              console.log(`Using existing category by name after duplicate: ${categoryId}`);
+            } else {
+              throw insertError;
+            }
+          } else {
+            throw insertError;
+          }
         }
       }
     }
 
-    // 2. Verknüpfung erstellen
+    // Verknüpfung erstellen (game_categories)
     const { error: linkError } = await supabase
       .from('game_categories')
       .insert([{ game_id: gameId, category_id: categoryId }]);
 
-    if (linkError && linkError.code !== '23505') { // Ignore unique constraint violations
+    if (linkError && linkError.code !== '23505') { // 23505 = unique constraint (ignore)
       throw linkError;
     }
   }
