@@ -614,14 +614,14 @@ const GameForm = ({ mode = 'add' }) => {
 
           <div className="form-row">
             <div className="form-group full-width">
-              <label htmlFor="spieler">Spieler-Typ</label>
+              <label htmlFor="spieler">Spieltyp</label>
               <input
                 type="text"
                 id="spieler"
                 name="spieler"
                 value={formData.spieler ?? ''}
                 onChange={handleChange}
-                placeholder="z.B. Familien, Kennerspieler"
+                placeholder="z.B. Strategy, Dice, Card Game"
               />
             </div>
           </div>

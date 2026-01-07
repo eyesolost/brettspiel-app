@@ -16,7 +16,14 @@ const GameItem = ({ game, onDelete }) => {
   };
 
   const renderRating = (rating, max = 10) => {
-    const percentage = (rating / max) * 100;
+    let value = typeof rating === 'number'
+      ? rating
+      : rating != null
+        ? parseFloat(rating)
+        : 0;
+    if (isNaN(value)) value = 0;
+    value = Math.max(0, Math.min(value, max));
+    const percentage = (value / max) * 100;
     let colorClass = 'rating-low';
     if (percentage >= 70) colorClass = 'rating-high';
     else if (percentage >= 40) colorClass = 'rating-medium';
@@ -24,19 +31,22 @@ const GameItem = ({ game, onDelete }) => {
     return (
       <div className="rating-container">
         <div className={`rating-bar ${colorClass}`} style={{ width: `${percentage}%` }}>
-          <span className="rating-text">{rating}/{max}</span>
+          <span className="rating-text">{value}/{max}</span>
         </div>
       </div>
     );
   };
 
   const renderComplexity = (level) => {
+    let value = typeof level === 'number' ? level : parseInt(level, 10);
+    if (isNaN(value)) value = 0;
+    value = Math.max(0, Math.min(value, 5));
     return (
       <div className="complexity-display">
         {[...Array(5)].map((_, index) => (
           <FaStar
             key={index}
-            className={index < level ? 'star-filled' : 'star-empty'}
+            className={index < value ? 'star-filled' : 'star-empty'}
           />
         ))}
       </div>
