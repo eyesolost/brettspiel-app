@@ -17,6 +17,7 @@ const GameForm = ({ mode = 'add' }) => {
     spieler: '',
     erweiterungenInBesitz: [],
     erweiterungenZurAnschaffung: [],
+    categories: [],
     strategie: 5,
     spass: 5,
     glueck: 5,
@@ -36,6 +37,7 @@ const GameForm = ({ mode = 'add' }) => {
 
   const [erweiterungInput, setErweiterungInput] = useState('');
   const [anschaffungInput, setAnschaffungInput] = useState('');
+  const [categoryInput, setCategoryInput] = useState('');
 
   const reverseTransformFormData = (data) => {
     // Transform database schema back to form data
@@ -72,7 +74,8 @@ const GameForm = ({ mode = 'add' }) => {
         setFormData({
           ...formattedGame,
           erweiterungenInBesitz: game.erweiterungenInBesitz || [],
-          erweiterungenZurAnschaffung: game.erweiterungenZurAnschaffung || []
+          erweiterungenZurAnschaffung: game.erweiterungenZurAnschaffung || [],
+          categories: game.categories || []
         });
       }
     }
@@ -109,6 +112,24 @@ const GameForm = ({ mode = 'add' }) => {
     setFormData({
       ...formData,
       [field]: formData[field].filter((_, i) => i !== index)
+    });
+  };
+
+  const handleAddCategory = () => {
+    if (!categoryInput.trim()) return;
+
+    const newCategory = { name: categoryInput.trim() };
+    setFormData({
+      ...formData,
+      categories: [...formData.categories, newCategory]
+    });
+    setCategoryInput('');
+  };
+
+  const handleRemoveCategory = (index) => {
+    setFormData({
+      ...formData,
+      categories: formData.categories.filter((_, i) => i !== index)
     });
   };
 
@@ -510,6 +531,49 @@ const GameForm = ({ mode = 'add' }) => {
                 />
                 <span>Fehlteile</span>
               </label>
+            </div>
+          </div>
+        </div>
+
+        <div className="form-section">
+          <h2>Kategorien</h2>
+          
+          <div className="form-group">
+            <label>Spieltyp / Kategorien</label>
+            <div className="tag-input-container">
+              <input
+                type="text"
+                value={categoryInput}
+                onChange={(e) => setCategoryInput(e.target.value)}
+                placeholder="Kategorie eingeben (z.B. Strategy, Dice)..."
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddCategory();
+                  }
+                }}
+              />
+              <button
+                type="button"
+                onClick={handleAddCategory}
+                className="btn-add-tag"
+              >
+                Hinzufügen
+              </button>
+            </div>
+            <div className="tags-list">
+              {formData.categories.map((cat, index) => (
+                <span key={index} className="tag tag-category">
+                  {cat.name}
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveCategory(index)}
+                    className="tag-remove"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
             </div>
           </div>
         </div>

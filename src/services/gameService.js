@@ -18,7 +18,7 @@ import { supabase } from '../lib/supabaseClient'
  */
 export const createGame = async (gameData, forceCreate = false) => {
   try {
-    const { erweiterungenInBesitz, erweiterungenZurAnschaffung, ...gameFields } = gameData
+    const { erweiterungenInBesitz, erweiterungenZurAnschaffung, categories, ...gameFields } = gameData
     
     console.log('gameService - createGame - gameFields vor Insert:', {
       min_spieler: gameFields.min_spieler,
@@ -80,6 +80,11 @@ export const createGame = async (gameData, forceCreate = false) => {
 
     if (erweiterungenZurAnschaffung?.length > 0) {
       await createExtensions(game.id, erweiterungenZurAnschaffung, 'zur_anschaffung')
+    }
+
+    // Insert categories
+    if (categories?.length > 0) {
+      await createCategories(game.id, categories)
     }
 
     return await getGameById(game.id)
@@ -166,6 +171,42 @@ const createExtensions = async (gameId, extensionNames, type) => {
   if (error) throw error
 }
 
+const createCategories = async (gameId, categoriesData) => {
+  // categoriesData ist ein Array von {id, name} Objekten aus BGG
+  for (const cat of categoriesData) {
+    // 1. Prüfe ob Kategorie existiert, sonst erstelle sie
+    let categoryId;
+    const { data: existing } = await supabase
+      .from('categories')
+      .select('id')
+      .eq('name', cat.name)
+      .single()
+
+    if (existing) {
+      categoryId = existing.id
+    } else {
+      // Neue Kategorie erstellen
+      const { data: newCat, error: catError } = await supabase
+        .from('categories')
+        .insert([{ name: cat.name, bgg_id: cat.id ? parseInt(cat.id) : null }])
+        .select('id')
+        .single()
+      
+      if (catError) throw catError
+      categoryId = newCat.id
+    }
+
+    // 2. Verknüpfung erstellen
+    const { error: linkError } = await supabase
+      .from('game_categories')
+      .insert([{ game_id: gameId, category_id: categoryId }])
+    
+    if (linkError && linkError.code !== '23505') { // Ignore unique constraint violations
+      throw linkError
+    }
+  }
+}
+
 // ============================================
 // READ
 // ============================================
@@ -189,7 +230,29 @@ export const getAllGames = async () => {
 
     if (error) throw error
 
-    return games.map(game => transformGameFromDB(game))
+    // Categories separat laden (Supabase unterstützt nested many-to-many nicht direkt)
+    const gamesWithCategories = await Promise.all(
+      games.map(async (game) => {
+        const { data: gameCats } = await supabase
+          .from('game_categories')
+          .select(`
+            category_id,
+            categories (
+              id,
+              name,
+              bgg_id
+            )
+          `)
+          .eq('game_id', game.id)
+        
+        return {
+          ...game,
+          categories: gameCats?.map(gc => gc.categories) || []
+        }
+      })
+    )
+
+    return gamesWithCategories.map(game => transformGameFromDB(game))
   } catch (error) {
     console.error('Error fetching games:', error)
     throw error
@@ -216,7 +279,25 @@ export const getGameById = async (id) => {
 
     if (error) throw error
 
-    return transformGameFromDB(game)
+    // Categories laden
+    const { data: gameCats } = await supabase
+      .from('game_categories')
+      .select(`
+        category_id,
+        categories (
+          id,
+          name,
+          bgg_id
+        )
+      `)
+      .eq('game_id', game.id)
+    
+    const gameWithCategories = {
+      ...game,
+      categories: gameCats?.map(gc => gc.categories) || []
+    }
+
+    return transformGameFromDB(gameWithCategories)
   } catch (error) {
     console.error('Error fetching game:', error)
     throw error
@@ -563,7 +644,7 @@ export const getStatistics = async () => {
  * Transform game from DB to app format
  */
 const transformGameFromDB = (game) => {
-  const { extensions, ...gameData } = game
+  const { extensions, categories, ...gameData } = game
 
   return {
     ...gameData,
@@ -572,7 +653,8 @@ const transformGameFromDB = (game) => {
       .map(ext => ext.name) || [],
     erweiterungenZurAnschaffung: extensions
       ?.filter(ext => ext.type === 'zur_anschaffung')
-      .map(ext => ext.name) || []
+      .map(ext => ext.name) || [],
+    categories: categories || []
   }
 }
 

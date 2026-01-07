@@ -96,8 +96,11 @@ const BGGImport = () => {
         verlag: selectedPublisher,
         erweiterungenInBesitz,
         erweiterungenZurAnschaffung,
-        // Kategorien in spieler-Feld, Families in Info
-        spieler: selectedCategories.join(', '),
+        // Kategorien als Array von Objekten für DB
+        categories: importDialog.bggData.categories.filter(cat => 
+          selectedCategories.includes(cat.name)
+        ),
+        // Families in Info
         info: [
           importDialog.gameData.info,
           selectedFamilies.length > 0 ? `\n\nFamilien: ${selectedFamilies.join(', ')}` : ''

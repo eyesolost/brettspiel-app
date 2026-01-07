@@ -77,6 +77,22 @@ const GameItem = ({ game, onDelete }) => {
             ⚠️
           </span>
         )}
+        {game.categories && game.categories.length > 0 && (
+          <div className="categories-tags" style={{ marginTop: '4px' }}>
+            {game.categories.map((cat, idx) => (
+              <span key={idx} className="tag tag-category" style={{ 
+                fontSize: '0.75rem', 
+                padding: '2px 6px', 
+                marginRight: '4px',
+                backgroundColor: '#e3f2fd',
+                color: '#1976d2',
+                borderRadius: '3px'
+              }}>
+                {cat.name}
+              </span>
+            ))}
+          </div>
+        )}
       </td>
       <td>{formatSpieler()}</td>
       <td>{formatSpieldauer()} min</td>
