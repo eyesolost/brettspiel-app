@@ -4,7 +4,7 @@ import GameItem from './GameItem';
 import FilterBar from './FilterBar';
 import { FaSortUp, FaSortDown, FaSort, FaChevronDown, FaChevronUp, FaFilter } from 'react-icons/fa';
 import '../styles/GameList.css';
-import { istInIntervall, intervallZuArray } from '../utils/helpers';
+import { intervallZuArray } from '../utils/helpers';
 
 const GameList = () => {
   const { games, loading, deleteGame } = useGames();
@@ -59,8 +59,32 @@ const GameList = () => {
             return game.spass >= parseInt(filterValue);
           case 'maxKomplexitaet':
             return game.komplexitaet <= parseInt(filterValue);
-          case 'spieleranzahl':
-            return istInIntervall(game.minMaxSpieler, filterValue);
+          case 'spieleranzahl': {
+            const val = (filterValue || '').trim();
+            if (!val) return true;
+
+            // Parse filter as either single number or interval
+            let filterNumbers = [];
+            if (val.includes('-')) {
+              filterNumbers = intervallZuArray(val);
+            } else {
+              const n = parseInt(val, 10);
+              if (!isNaN(n)) filterNumbers = [n];
+            }
+
+            if (filterNumbers.length === 0) return true; // invalid input -> no filtering
+
+            const min = typeof game.min_spieler === 'number' ? game.min_spieler : null;
+            const max = typeof game.max_spieler === 'number' ? game.max_spieler : null;
+
+            // Match if ANY filter number lies within the game's player range
+            return filterNumbers.some((num) => {
+              if (min !== null && max !== null) return num >= min && num <= max;
+              if (min !== null) return num >= min;
+              if (max !== null) return num <= max;
+              return false;
+            });
+          }
           case'fehlteile':
             return game.fehlteile;
           default:

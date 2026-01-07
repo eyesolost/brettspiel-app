@@ -269,7 +269,7 @@ const GameForm = ({ mode = 'add' }) => {
                 type="text"
                 id="titel"
                 name="titel"
-                value={formData.titel}
+                value={formData.titel ?? ''}
                 onChange={handleChange}
                 required
                 placeholder="z.B. Catan"
@@ -284,7 +284,7 @@ const GameForm = ({ mode = 'add' }) => {
                 type="text"
                 id="verlag"
                 name="verlag"
-                value={formData.verlag}
+                value={formData.verlag ?? ''}
                 onChange={handleChange}
                 placeholder="z.B. KOSMOS"
               />
@@ -296,7 +296,7 @@ const GameForm = ({ mode = 'add' }) => {
                 type="text"
                 id="autor"
                 name="autor"
-                value={formData.autor}
+                value={formData.autor ?? ''}
                 onChange={handleChange}
                 placeholder="z.B. Klaus Teuber"
               />
@@ -310,7 +310,7 @@ const GameForm = ({ mode = 'add' }) => {
                 type="text"
                 id="minMaxSpieler"
                 name="minMaxSpieler"
-                value={formData.minMaxSpieler}
+                value={formData.minMaxSpieler ?? ''}
                 onChange={handleChange}
                 placeholder="z.B. 2-4"
               />
@@ -322,7 +322,7 @@ const GameForm = ({ mode = 'add' }) => {
                 type="text"
                 id="optimaleSpieleranzahl"
                 name="optimaleSpieleranzahl"
-                value={formData.optimaleSpieleranzahl}
+                value={formData.optimaleSpieleranzahl ?? ''}
                 onChange={handleChange}
                 placeholder="z.B. 3-4"
               />
@@ -334,7 +334,7 @@ const GameForm = ({ mode = 'add' }) => {
                 type="text"
                 id="minMaxSpielzeit"
                 name="minMaxSpielzeit"
-                value={formData.minMaxSpielzeit}
+                value={formData.minMaxSpielzeit ?? ''}
                 onChange={handleChange}
                 placeholder="z.B. 60-120"
               />
@@ -346,7 +346,7 @@ const GameForm = ({ mode = 'add' }) => {
                 type="number"
                 id="altersempfehlung"
                 name="altersempfehlung"
-                value={formData.altersempfehlung}
+                value={formData.altersempfehlung ?? ''}
                 onChange={handleChange}
                 min="0"
               />
@@ -365,7 +365,7 @@ const GameForm = ({ mode = 'add' }) => {
                 type="range"
                 id="strategie"
                 name="strategie"
-                value={formData.strategie}
+                value={formData.strategie ?? 5}
                 onChange={handleChange}
                 min="1"
                 max="10"
@@ -381,7 +381,7 @@ const GameForm = ({ mode = 'add' }) => {
                 type="range"
                 id="spass"
                 name="spass"
-                value={formData.spass}
+                value={formData.spass ?? 5}
                 onChange={handleChange}
                 min="1"
                 max="10"
@@ -397,7 +397,7 @@ const GameForm = ({ mode = 'add' }) => {
                 type="range"
                 id="glueck"
                 name="glueck"
-                value={formData.glueck}
+                value={formData.glueck ?? 5}
                 onChange={handleChange}
                 min="1"
                 max="10"
@@ -415,7 +415,7 @@ const GameForm = ({ mode = 'add' }) => {
                 type="range"
                 id="komplexitaet"
                 name="komplexitaet"
-                value={formData.komplexitaet}
+                value={formData.komplexitaet ?? 3}
                 onChange={handleChange}
                 min="1"
                 max="5"
@@ -429,7 +429,7 @@ const GameForm = ({ mode = 'add' }) => {
                 type="number"
                 id="bgg_rating"
                 name="bgg_rating"
-                value={formData.bgg_rating}
+                value={formData.bgg_rating ?? ''}
                 onChange={handleChange}
                 min="1"
                 max="10"
@@ -442,7 +442,7 @@ const GameForm = ({ mode = 'add' }) => {
               <select
                 id="rohrstrat"
                 name="rohrstrat"
-                value={formData.rohrstrat}
+                value={formData.rohrstrat ?? ''}
                 onChange={handleChange}
               >
                 <option value="">Bitte wählen</option>
@@ -465,7 +465,7 @@ const GameForm = ({ mode = 'add' }) => {
               <select
                 id="status"
                 name="status"
-                value={formData.status}
+                value={formData.status ?? 'Im Besitz'}
                 onChange={handleChange}
               >
                 <option value="Im Besitz">Im Besitz</option>
@@ -481,7 +481,7 @@ const GameForm = ({ mode = 'add' }) => {
                 type="text"
                 id="standort"
                 name="standort"
-                value={formData.standort}
+                value={formData.standort ?? ''}
                 onChange={handleChange}
                 placeholder="z.B. Regal A - Ebene 2"
               />
@@ -493,7 +493,7 @@ const GameForm = ({ mode = 'add' }) => {
                 type="date"
                 id="anschaffungsdatum"
                 name="anschaffungsdatum"
-                value={formData.anschaffungsdatum}
+                value={formData.anschaffungsdatum ?? ''}
                 onChange={handleChange}
               />
             </div>
@@ -605,7 +605,7 @@ const GameForm = ({ mode = 'add' }) => {
                 type="text"
                 id="awards"
                 name="awards"
-                value={formData.awards}
+                value={formData.awards ?? ''}
                 onChange={handleChange}
                 placeholder="z.B. Spiel des Jahres 2019"
               />
@@ -619,7 +619,7 @@ const GameForm = ({ mode = 'add' }) => {
                 type="text"
                 id="spieler"
                 name="spieler"
-                value={formData.spieler}
+                value={formData.spieler ?? ''}
                 onChange={handleChange}
                 placeholder="z.B. Familien, Kennerspieler"
               />
@@ -632,7 +632,7 @@ const GameForm = ({ mode = 'add' }) => {
               <textarea
                 id="info"
                 name="info"
-                value={formData.info}
+                value={formData.info ?? ''}
                 onChange={handleChange}
                 rows="4"
                 placeholder="Zusätzliche Informationen..."

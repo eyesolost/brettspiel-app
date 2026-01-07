@@ -212,8 +212,8 @@ const BGGImport = () => {
           <div className="results-section">
             <h2>Suchergebnisse ({searchResults.length})</h2>
             <div className="results-grid">
-              {searchResults.map((game) => (
-                <div key={game.id} className="game-card">
+              {searchResults.map((game, idx) => (
+                <div key={`${game.id}-${idx}`} className="game-card">
                   <div className="game-card-header">
                     <h3>{game.name}</h3>
                     {game.yearPublished && (
@@ -301,8 +301,8 @@ const BGGImport = () => {
                 <div className="dialog-section">
                   <h3>Kategorien wählen (optional):</h3>
                   <div className="multiselect-options">
-                    {importDialog.bggData.categories.map((cat) => (
-                      <label key={cat.id} className="checkbox-option">
+                    {importDialog.bggData.categories.map((cat, idx) => (
+                      <label key={`cat-${cat.id}-${idx}`} className="checkbox-option">
                         <input
                           type="checkbox"
                           checked={selectedCategories.includes(cat.name)}
@@ -321,8 +321,8 @@ const BGGImport = () => {
                 <div className="dialog-section">
                   <h3>Familien wählen (optional):</h3>
                   <div className="multiselect-options">
-                    {importDialog.bggData.families.slice(0, 10).map((fam) => (
-                      <label key={fam.id} className="checkbox-option">
+                    {importDialog.bggData.families.slice(0, 10).map((fam, idx) => (
+                      <label key={`fam-${fam.id}-${idx}`} className="checkbox-option">
                         <input
                           type="checkbox"
                           checked={selectedFamilies.includes(fam.name)}
