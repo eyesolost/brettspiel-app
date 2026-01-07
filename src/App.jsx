@@ -1,10 +1,8 @@
 // src/App.jsx - Beispiel mit Simple Password Auth
 import { AuthProvider, useAuth } from './context/SimpleAuthContext'
 import SimpleLogin from './components/Auth/SimpleLogin'
-import { useGames } from './hooks/useSimpleGames'
 import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import { GameProvider } from "./context/GameContext";
 import Navbar from "./components/Navbar";
 import GameList from "./components/GameList";
 import GameForm from "./components/GameForm";
@@ -21,7 +19,6 @@ function App() {
 
 function AppContent() {
   const { isAuthenticated, loading: authLoading, logout } = useAuth()
-  const { games, loading, addGame, editGame, removeGame } = useGames()
 
   // Show loading state while checking authentication
   // Not Authenticated - Show Login
@@ -31,28 +28,26 @@ function AppContent() {
 
   // Authenticated - Show App
   return (
-    <GameProvider>
-      <Router>
-        <div className="app">
-          <Navbar />
-          <main className="main-content">
-            <Routes>
-              <Route path="/" element={<GameList />} />
-              <Route path="/add" element={<GameForm mode="add" />} />
-              <Route path="/edit/:id" element={<GameForm mode="edit" />} />
-              <Route path="/bgg-import" element={<BGGImport />} />
-              <Route path="/data" element={<DataManager />} />
-            </Routes>
-          </main>
-          <footer className="app-footer">
-            <p>
-              🎲 Brettspiel-Verwaltungs-App | Made with React | Powered by BGG
-              API
-            </p>
-          </footer>
-        </div>
-      </Router>
-    </GameProvider>
+    <Router>
+      <div className="app">
+        <Navbar />
+        <main className="main-content">
+          <Routes>
+            <Route path="/" element={<GameList />} />
+            <Route path="/add" element={<GameForm mode="add" />} />
+            <Route path="/edit/:id" element={<GameForm mode="edit" />} />
+            <Route path="/bgg-import" element={<BGGImport />} />
+            <Route path="/data" element={<DataManager />} />
+          </Routes>
+        </main>
+        <footer className="app-footer">
+          <p>
+            🎲 Brettspiel-Verwaltungs-App | Made with React | Powered by BGG
+            API
+          </p>
+        </footer>
+      </div>
+    </Router>
   );
 }
 

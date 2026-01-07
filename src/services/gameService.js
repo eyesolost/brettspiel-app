@@ -172,40 +172,114 @@ const createExtensions = async (gameId, extensionNames, type) => {
 }
 
 const createCategories = async (gameId, categoriesData) => {
-  // categoriesData ist ein Array von {id, name} Objekten aus BGG
-  for (const cat of categoriesData) {
-    // 1. Prüfe ob Kategorie existiert, sonst erstelle sie
-    let categoryId;
-    const { data: existing } = await supabase
-      .from('categories')
-      .select('id')
-      .eq('name', cat.name)
-      .single()
+  // categoriesData ist ein Array von Kategorien:
+  // - Vom User eingegeben: {name: "..."} oder {name: "...", name_de: "..."}
+  // - Von der DB (bestehend): {id: "uuid", name: "...", name_de: "...", bgg_id: 1014}
+  const { bggService } = await import('./bggService.js');
 
-    if (existing) {
-      categoryId = existing.id
+  for (const cat of categoriesData) {
+    let categoryId;
+    
+    // Wenn eine UUID vorhanden ist, ist es eine bestehende Kategorie
+    if (cat.id && cat.id.match(/^[0-9a-f-]{36}$/)) {
+      categoryId = cat.id;
+      console.log(`Using existing category: ${categoryId}`);
     } else {
-      // Neue Kategorie erstellen
-      const { data: newCat, error: catError } = await supabase
-        .from('categories')
-        .insert([{ name: cat.name, bgg_id: cat.id ? parseInt(cat.id) : null }])
-        .select('id')
-        .single()
-      
-      if (catError) throw catError
-      categoryId = newCat.id
+      // Neue Kategorie vom User
+      let bgg_id = cat.bgg_id || null;
+      // Stelle sicher, dass bgg_id als Zahl gespeichert wird
+      if (typeof bgg_id === 'string') {
+        const parsed = parseInt(bgg_id, 10);
+        bgg_id = isNaN(parsed) ? null : parsed;
+      }
+      let name_de = cat.name_de || null;
+      let original_name = cat.original_name || null;
+      let display_name = cat.name || '';
+
+      // Wenn keine bgg_id vorhanden, versuche BGG-Kategorie zu finden
+      if (!bgg_id && display_name) {
+        const bggMatch = await bggService.findBGGCategory(display_name);
+        if (bggMatch) {
+          bgg_id = bggMatch.id;
+          original_name = bggMatch.name; // Original Name von BGG
+          console.log(`Category matched: "${display_name}" -> BGG "${original_name}" (ID: ${bgg_id})`);
+        }
+      }
+
+      // 1. Prüfe ob Kategorie mit dieser bgg_id existiert
+      if (bgg_id) {
+        const { data: existing } = await supabase
+            .from('categories')
+            .select('id, name_de, name, original_name')
+            .eq('bgg_id', bgg_id)
+            .single();
+
+        if (existing) {
+          categoryId = existing.id;
+          // Update name_de falls vorhanden und noch nicht gesetzt
+          if (name_de) {
+            await supabase
+              .from('categories')
+              .update({ name_de })
+              .eq('id', categoryId);
+          }
+          console.log(`Using existing BGG category: ${categoryId}`);
+        } else {
+          // Neue Kategorie mit bgg_id erstellen
+          const { data: newCat, error: catError } = await supabase
+            .from('categories')
+            .insert([{ 
+              name: name_de || display_name,
+              name_de,
+              original_name,
+              bgg_id 
+            }])
+            .select('id')
+            .single();
+
+          if (catError) throw catError;
+          categoryId = newCat.id;
+          console.log(`Created new category with bgg_id: ${categoryId}`);
+        }
+      } else {
+        // Keine bgg_id: Suche nach Name
+        const { data: existing } = await supabase
+          .from('categories')
+          .select('id')
+          .eq('name', display_name)
+          .single();
+
+        if (existing) {
+          categoryId = existing.id;
+          console.log(`Using existing custom category: ${categoryId}`);
+        } else {
+          // Neue Kategorie ohne bgg_id
+          const { data: newCat, error: catError } = await supabase
+            .from('categories')
+            .insert([{ 
+              name: display_name,
+              name_de 
+            }])
+            .select('id')
+            .single();
+
+          if (catError) throw catError;
+          categoryId = newCat.id;
+          console.log(`Created new custom category: ${categoryId}`);
+        }
+      }
     }
 
     // 2. Verknüpfung erstellen
     const { error: linkError } = await supabase
       .from('game_categories')
-      .insert([{ game_id: gameId, category_id: categoryId }])
-    
+      .insert([{ game_id: gameId, category_id: categoryId }]);
+
     if (linkError && linkError.code !== '23505') { // Ignore unique constraint violations
-      throw linkError
+      throw linkError;
     }
   }
-}
+};
 
 // ============================================
 // READ
@@ -240,6 +314,8 @@ export const getAllGames = async () => {
             categories (
               id,
               name,
+              name_de,
+              original_name,
               bgg_id
             )
           `)
@@ -287,6 +363,8 @@ export const getGameById = async (id) => {
         categories (
           id,
           name,
+          name_de,
+          original_name,
           bgg_id
         )
       `)
@@ -383,17 +461,17 @@ export const filterGames = async (filters) => {
  */
 export const updateGame = async (id, updates) => {
   try {
-    const { erweiterungenInBesitz, erweiterungenZurAnschaffung, ...gameUpdates } = updates
+    const { erweiterungenInBesitz, erweiterungenZurAnschaffung, categories, ...gameUpdates } = updates
 
-    // Update game
-    const { data: game, error: gameError } = await supabase
-      .from('games')
-      .update(gameUpdates)
-      .eq('id', id)
-      .select()
-      .single()
+    // Update game (only if there are fields to update)
+    if (Object.keys(gameUpdates).length > 0) {
+      const { error: gameError } = await supabase
+        .from('games')
+        .update(gameUpdates)
+        .eq('id', id)
 
-    if (gameError) throw gameError
+      if (gameError) throw gameError
+    }
 
     // Update extensions if provided
     if (erweiterungenInBesitz !== undefined || erweiterungenZurAnschaffung !== undefined) {
@@ -409,6 +487,19 @@ export const updateGame = async (id, updates) => {
       }
       if (erweiterungenZurAnschaffung?.length > 0) {
         await createExtensions(id, erweiterungenZurAnschaffung, 'zur_anschaffung')
+      }
+    }
+
+    // Update categories if provided
+    if (categories !== undefined) {
+      // Delete existing links
+      await supabase
+        .from('game_categories')
+        .delete()
+        .eq('game_id', id)
+
+      if (categories?.length > 0) {
+        await createCategories(id, categories)
       }
     }
 

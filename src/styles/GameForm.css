@@ -204,12 +204,45 @@
   background-color: #389e0d;
 }
 
+.categories-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.btn-add-category {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background-color 0.2s;
+  align-self: flex-start;
+}
+
+.btn-add-category:hover {
+  background-color: #1565c0;
+}
+
 .tags-list {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
   margin-top: 12px;
   min-height: 30px;
+}
+
+.tags-list .empty-state {
+  color: #999;
+  font-style: italic;
+  margin: 0;
+  padding: 8px 0;
 }
 
 .tag {
@@ -224,6 +257,28 @@
   font-weight: 500;
 }
 
+.tag-category {
+  background-color: #e3f2fd;
+  color: #1976d2;
+  padding: 6px 8px;
+}
+
+.tag-content {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tag-de {
+  font-weight: 600;
+}
+
+.tag-en {
+  font-size: 12px;
+  opacity: 0.7;
+  font-weight: normal;
+}
+
 .tag-warning {
   background-color: var(--warning-color);
 }
@@ -231,7 +286,7 @@
 .tag-remove {
   background: none;
   border: none;
-  color: white;
+  color: currentColor;
   font-size: 18px;
   font-weight: bold;
   cursor: pointer;
@@ -246,7 +301,7 @@
 }
 
 .tag-remove:hover {
-  background-color: rgba(255, 255, 255, 0.2);
+  background-color: rgba(0, 0, 0, 0.1);
 }
 
 /* Form Actions */

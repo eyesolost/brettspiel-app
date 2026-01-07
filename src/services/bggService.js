@@ -393,10 +393,147 @@ class BGGService {
     if (complexity < 4.5) return 'Hoch';
     return 'Sehr Hoch';
   }
-}
 
-// Export Singleton-Instanz
-export const bggService = new BGGService();
+  /**
+   * Hole alle Kategorien von BGG (cached)
+   * Diese Funktion sollte sparsam aufgerufen werden wegen Rate Limiting
+   * @returns {Promise<Array>} Array mit {id, name}
+   */
+  async getBGGCategories() {
+    return requestQueue.add(async () => {
+      // BGG API hat keinen direkten Endpoint für Kategorien
+      // Wir bauen eine kleine Liste mit den häufigsten Kategorien manuell
+      // In Zukunft könnte man diese aus einer anderen Quelle laden
+      const commonCategories = [
+        { id: 1001, name: 'Abstract' },
+        { id: 1002, name: 'Action / Dexterity' },
+        { id: 1003, name: 'Adventure' },
+        { id: 1004, name: 'Age of Exploration' },
+        { id: 1005, name: 'American Civil War' },
+        { id: 1006, name: 'American West' },
+        { id: 1007, name: 'Ancient' },
+        { id: 1008, name: 'Animals' },
+        { id: 1009, name: 'Aviation / Flight' },
+        { id: 1010, name: 'Card Game' },
+        { id: 1011, name: 'City Building' },
+        { id: 1012, name: 'Civil War' },
+        { id: 1013, name: 'Deduction' },
+        { id: 1014, name: 'Dice' },
+        { id: 1015, name: 'Economic' },
+        { id: 1016, name: 'Educational' },
+        { id: 1017, name: 'Electronic' },
+        { id: 1018, name: 'Exploration' },
+        { id: 1019, name: 'Fantasy' },
+        { id: 1020, name: 'Fighting' },
+        { id: 1021, name: 'Medieval' },
+        { id: 1022, name: 'Memory' },
+        { id: 1023, name: 'Military' },
+        { id: 1024, name: 'Modern Warfare' },
+        { id: 1025, name: 'Movies / TV / Radio theme' },
+        { id: 1026, name: 'Murder / Mystery' },
+        { id: 1027, name: 'Mythology' },
+        { id: 1028, name: 'Negotiation' },
+        { id: 1029, name: 'Party Game' },
+        { id: 1030, name: 'Puzzle' },
+        { id: 1031, name: 'Racing' },
+        { id: 1032, name: 'Real-time' },
+        { id: 1033, name: 'Religious' },
+        { id: 1034, name: 'Renaissance' },
+        { id: 1035, name: 'Science Fiction' },
+        { id: 1036, name: 'Spies / Secret Agents' },
+        { id: 1037, name: 'Sports' },
+        { id: 1038, name: 'Strategy' },
+        { id: 1039, name: 'Territory Building' },
+        { id: 1040, name: 'Train' },
+        { id: 1041, name: 'Travel' },
+        { id: 1042, name: 'Trivia' },
+        { id: 1043, name: 'Video Game Theme' },
+        { id: 1044, name: 'Wargame' },
+        { id: 1045, name: 'Word Game' },
+        { id: 1046, name: 'World War I' },
+        { id: 1047, name: 'World War II' }
+      ];
+      return commonCategories;
+    });
+  }
+
+  /**
+   * Finde beste BGG-Kategorie-Übereinstimmung für einen Namen (fuzzy match)
+   * @param {string} categoryName - Name der Kategorie
+   * @returns {Promise<Object>} {id, name, similarity} oder null
+   */
+  async findBGGCategory(categoryName) {
+    const bggCategories = await this.getBGGCategories();
+    const lower = categoryName.toLowerCase();
+    
+    // Exact match first
+    const exact = bggCategories.find(c => c.name.toLowerCase() === lower);
+    if (exact) return { ...exact, similarity: 1 };
+    
+    // Partial/fuzzy match
+    let best = null;
+    let bestScore = 0;
+    
+    bggCategories.forEach(cat => {
+      const catLower = cat.name.toLowerCase();
+      
+      // Substring match
+      if (catLower.includes(lower) || lower.includes(catLower)) {
+        const score = 0.8;
+        if (score > bestScore) {
+          best = cat;
+          bestScore = score;
+        }
+      }
+      
+      // Levenshtein-ähnlicher Score (vereinfacht)
+      const similarity = this._calculateSimilarity(lower, catLower);
+      if (similarity > bestScore) {
+        best = cat;
+        bestScore = similarity;
+      }
+    });
+    
+    return best && bestScore > 0.5 ? { ...best, similarity: bestScore } : null;
+  }
+
+  /**
+   * Vereinfachte Ähnlichkeitsberechnung
+   */
+  _calculateSimilarity(str1, str2) {
+    const longer = str1.length > str2.length ? str1 : str2;
+    const shorter = str1.length > str2.length ? str2 : str1;
+    
+    if (longer.length === 0) return 1.0;
+    
+    const editDistance = this._levenshtein(longer, shorter);
+    return (longer.length - editDistance) / longer.length;
+  }
+
+  /**
+   * Levenshtein-Distanz
+   */
+  _levenshtein(s1, s2) {
+    const costs = [];
+    for (let i = 0; i <= s1.length; i++) {
+      let lastValue = i;
+      for (let j = 0; j <= s2.length; j++) {
+        if (i === 0) {
+          costs[j] = j;
+        } else if (j > 0) {
+          let newValue = costs[j - 1];
+          if (s1.charAt(i - 1) !== s2.charAt(j - 1)) {
+            newValue = Math.min(Math.min(newValue, lastValue), costs[j]) + 1;
+          }
+          costs[j - 1] = lastValue;
+          lastValue = newValue;
+        }
+      }
+      if (i > 0) costs[s2.length] = lastValue;
+    }
+    return costs[s2.length];
+  }
+}
 
 // Beispiel-Verwendung:
 /*
@@ -415,4 +552,10 @@ const importedGame = await bggService.importGame(13);
 // 4. Hot Games abrufen
 const hotGames = await bggService.getHotGames();
 console.log(hotGames);
+
+// 5. Kategorie abgleichen
+const match = await bggService.findBGGCategory('Strategy');
+console.log(match); // {id: 1038, name: 'Strategy', similarity: 1}
 */
+
+export const bggService = new BGGService();

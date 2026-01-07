@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useGames } from '../context/GameContext';
-import { FaSave, FaTimes } from 'react-icons/fa';
+import { FaSave, FaTimes, FaPlus } from 'react-icons/fa';
+import CategoryDialog from './CategoryDialog';
 import '../styles/GameForm.css';
 
 const GameForm = ({ mode = 'add' }) => {
@@ -37,7 +38,8 @@ const GameForm = ({ mode = 'add' }) => {
 
   const [erweiterungInput, setErweiterungInput] = useState('');
   const [anschaffungInput, setAnschaffungInput] = useState('');
-  const [categoryInput, setCategoryInput] = useState('');
+  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
+  const [allCategories, setAllCategories] = useState([]);
 
   const reverseTransformFormData = (data) => {
     // Transform database schema back to form data
@@ -79,6 +81,10 @@ const GameForm = ({ mode = 'add' }) => {
         });
       }
     }
+    
+    // Load all available categories from context or database
+    // For now, we'll assume they come from the game context
+    // This would need to be enhanced to fetch all categories from the database
   }, [mode, id, getGameById]);
 
   const handleChange = (e) => {
@@ -115,15 +121,47 @@ const GameForm = ({ mode = 'add' }) => {
     });
   };
 
-  const handleAddCategory = () => {
-    if (!categoryInput.trim()) return;
+  const handleOpenCategoryDialog = () => {
+    setCategoryDialogOpen(true);
+  };
 
-    const newCategory = { name: categoryInput.trim() };
+  const handleCloseCategoryDialog = () => {
+    setCategoryDialogOpen(false);
+  };
+
+  const handleSaveNewCategory = (newCategory) => {
+    // Check if category already exists
+    const exists = formData.categories.some(
+      cat => cat.name?.toLowerCase() === newCategory.name.toLowerCase()
+    );
+    
+    if (exists) {
+      alert('Diese Kategorie existiert bereits.');
+      return;
+    }
+
     setFormData({
       ...formData,
       categories: [...formData.categories, newCategory]
     });
-    setCategoryInput('');
+    setCategoryDialogOpen(false);
+  };
+
+  const handleSelectExistingCategory = (category) => {
+    // Check if already selected
+    const exists = formData.categories.some(
+      cat => cat.id === category.id || cat.name === category.name
+    );
+    
+    if (exists) {
+      alert('Diese Kategorie ist bereits ausgewählt.');
+      return;
+    }
+
+    setFormData({
+      ...formData,
+      categories: [...formData.categories, category]
+    });
   };
 
   const handleRemoveCategory = (index) => {
@@ -540,43 +578,47 @@ const GameForm = ({ mode = 'add' }) => {
           
           <div className="form-group">
             <label>Spieltyp / Kategorien</label>
-            <div className="tag-input-container">
-              <input
-                type="text"
-                value={categoryInput}
-                onChange={(e) => setCategoryInput(e.target.value)}
-                placeholder="Kategorie eingeben (z.B. Strategy, Dice)..."
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleAddCategory();
-                  }
-                }}
-              />
+            <div className="categories-section">
+              <div className="tags-list">
+                {formData.categories.length === 0 ? (
+                  <p className="empty-state">Keine Kategorien ausgewählt</p>
+                ) : (
+                  formData.categories.map((cat, index) => (
+                    <span key={index} className="tag tag-category">
+                      <span className="tag-content">
+                        <span className="tag-de">{cat.name_de || cat.name}</span>
+                        {cat.name_de && cat.name !== cat.name_de && (
+                          <span className="tag-en">{cat.name}</span>
+                        )}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveCategory(index)}
+                        className="tag-remove"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))
+                )}
+              </div>
               <button
                 type="button"
-                onClick={handleAddCategory}
-                className="btn-add-tag"
+                onClick={handleOpenCategoryDialog}
+                className="btn-add-category"
               >
-                Hinzufügen
+                <FaPlus /> Kategorie hinzufügen
               </button>
-            </div>
-            <div className="tags-list">
-              {formData.categories.map((cat, index) => (
-                <span key={index} className="tag tag-category">
-                  {cat.name}
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveCategory(index)}
-                    className="tag-remove"
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
             </div>
           </div>
         </div>
+
+        <CategoryDialog
+          isOpen={categoryDialogOpen}
+          onClose={handleCloseCategoryDialog}
+          onSave={handleSaveNewCategory}
+          existingCategories={formData.categories}
+        />
 
         <div className="form-section">
           <h2>Erweiterungen</h2>

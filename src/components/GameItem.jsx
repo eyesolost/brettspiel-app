@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaEdit, FaTrash, FaStar, FaCheckCircle, FaTimesCircle } from 'react-icons/fa';
+import { FaEdit, FaTrash, FaStar } from 'react-icons/fa';
 
 const GameItem = ({ game, onDelete }) => {
   const navigate = useNavigate();
@@ -86,9 +86,10 @@ const GameItem = ({ game, onDelete }) => {
                 marginRight: '4px',
                 backgroundColor: '#e3f2fd',
                 color: '#1976d2',
-                borderRadius: '3px'
+                borderRadius: '3px',
+                display: 'inline-block'
               }}>
-                {cat.name}
+                {cat.name_de || cat.name}
               </span>
             ))}
           </div>

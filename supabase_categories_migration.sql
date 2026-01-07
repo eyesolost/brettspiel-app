@@ -5,9 +5,12 @@
 -- 1. Categories Tabelle (Master-Tabelle für alle Kategorien)
 CREATE TABLE IF NOT EXISTS public.categories (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  name_de TEXT,
+  original_name TEXT,
   bgg_id INTEGER UNIQUE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+  UNIQUE(name_de, bgg_id)
 );
 
 -- 2. Game_Categories Junction Tabelle (Many-to-Many)
@@ -29,6 +32,12 @@ ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.game_categories ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies (alle können lesen und schreiben für authenticated users)
+DO $$
+BEGIN
+  DROP POLICY IF EXISTS "Allow all operations for authenticated users" ON public.categories;
+  DROP POLICY IF EXISTS "Allow all operations for authenticated users" ON public.game_categories;
+END $$;
+
 CREATE POLICY "Allow all operations for authenticated users" ON public.categories
   FOR ALL USING (true) WITH CHECK (true);
 
@@ -37,5 +46,8 @@ CREATE POLICY "Allow all operations for authenticated users" ON public.game_cate
 
 -- Kommentare für Dokumentation
 COMMENT ON TABLE public.categories IS 'Master-Tabelle für Spielkategorien (z.B. Strategy, Dice, Card Game)';
+COMMENT ON COLUMN public.categories.name IS 'Display-Name (deutsche Bezeichnung oder Original-Name)';
+COMMENT ON COLUMN public.categories.name_de IS 'Deutsche Übersetzung (falls vorhanden)';
+COMMENT ON COLUMN public.categories.original_name IS 'Original-Name von BGG (English)';
+COMMENT ON COLUMN public.categories.bgg_id IS 'BoardGameGeek Category ID (zur Synchronisation)';
 COMMENT ON TABLE public.game_categories IS 'Junction-Tabelle für Many-to-Many Beziehung zwischen games und categories';
-COMMENT ON COLUMN public.categories.bgg_id IS 'BoardGameGeek Category ID (optional)';
