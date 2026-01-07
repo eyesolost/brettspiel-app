@@ -119,9 +119,12 @@ const GameForm = ({ mode = 'add' }) => {
     const numericFields = [
       'min_spieler', 'max_spieler', 'optimale_spieleranzahl',
       'min_spielzeit', 'max_spielzeit',
-      'spass', 'strategie', 'glueck', 'komplexitaet', 'bgg_rating',
+      'spass', 'strategie', 'glueck', 'komplexitaet',
       'altersempfehlung', 'rohrstrat'
     ];
+    
+    // Float fields (not to be treated as integers)
+    const floatFields = ['bgg_rating'];
     
     // Copy all fields from data
     Object.keys(data).forEach(key => {
@@ -136,6 +139,11 @@ const GameForm = ({ mode = 'add' }) => {
       });
       transformed.min_spieler = parts[0];
       transformed.max_spieler = parts[1];
+      console.log('GameForm - transformFormData: Spieler zerlegt', {
+        input: data.minMaxSpieler,
+        min_spieler: transformed.min_spieler,
+        max_spieler: transformed.max_spieler
+      });
     } else {
       delete transformed.min_spieler;
       delete transformed.max_spieler;
@@ -150,6 +158,11 @@ const GameForm = ({ mode = 'add' }) => {
       });
       transformed.min_spielzeit = parts[0];
       transformed.max_spielzeit = parts[1];
+      console.log('GameForm - transformFormData: Spieldauer zerlegt', {
+        input: data.minMaxSpielzeit,
+        min_spielzeit: transformed.min_spielzeit,
+        max_spielzeit: transformed.max_spielzeit
+      });
     } else {
       delete transformed.min_spielzeit;
       delete transformed.max_spielzeit;
@@ -157,8 +170,9 @@ const GameForm = ({ mode = 'add' }) => {
     delete transformed.minMaxSpielzeit;
     
     // Rename optimaleSpieleranzahl to optimale_spieleranzahl
-    if (data.optimaleSpieleranzahl && data.optimaleSpieleranzahl.trim()) {
-      const num = parseInt(data.optimaleSpieleranzahl);
+    if (data.optimaleSpieleranzahl) {
+      const value = data.optimaleSpieleranzahl;
+      const num = typeof value === 'string' ? parseInt(value.trim()) : parseInt(value);
       transformed.optimale_spieleranzahl = isNaN(num) ? null : num;
     } else {
       delete transformed.optimale_spieleranzahl;
@@ -181,6 +195,23 @@ const GameForm = ({ mode = 'add' }) => {
       }
     });
     
+    // Handle float fields separately
+    floatFields.forEach(field => {
+      const value = transformed[field];
+      if (value === '' || value === null || value === undefined) {
+        delete transformed[field];
+      } else if (typeof value === 'string') {
+        const num = parseFloat(value);
+        if (isNaN(num)) {
+          delete transformed[field];
+        } else {
+          transformed[field] = parseFloat(num.toFixed(1));
+        }
+      } else if (typeof value === 'number') {
+        transformed[field] = parseFloat(value.toFixed(1));
+      }
+    });
+    
     // Remove fields that don't exist in the database
     delete transformed.spieler;
     
@@ -192,6 +223,18 @@ const GameForm = ({ mode = 'add' }) => {
 
     try {
       const transformedData = transformFormData(formData);
+      console.log('GameForm - Finales Objekt für DB:', {
+        min_spieler: transformedData.min_spieler,
+        max_spieler: transformedData.max_spieler,
+        min_spielzeit: transformedData.min_spielzeit,
+        max_spielzeit: transformedData.max_spielzeit,
+        komplexitaet: transformedData.komplexitaet,
+        strategie: transformedData.strategie,
+        spass: transformedData.spass,
+        glueck: transformedData.glueck,
+        bgg_rating: transformedData.bgg_rating,
+        type_bgg_rating: typeof transformedData.bgg_rating
+      });
       
       if (mode === 'edit') {
         await updateGame(id, transformedData);

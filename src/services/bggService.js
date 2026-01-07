@@ -124,7 +124,7 @@ class BGGService {
   /**
    * Hole detaillierte Informationen zu einem Spiel
    * @param {number|string} gameId - BGG ID des Spiels
-   * @returns {Promise<Object>} Detaillierte Spielinformationen
+   * @returns {Promise<Object>} Detaillierte Spielinformationen mit allen verfügbaren Daten
    */
   async getGameDetails(gameId) {
     return requestQueue.add(async () => {
@@ -136,28 +136,56 @@ class BGGService {
       const item = xml.querySelector('item');
       if (!item) throw new Error('Spiel nicht gefunden');
 
-      // Basis-Informationen
-      const primaryName = getAttribute(item, 'name[type="primary"]', 'value');
-      const yearPublished = getTextContent(item, 'yearpublished');
-      const minPlayers = getTextContent(item, 'minplayers');
-      const maxPlayers = getTextContent(item, 'maxplayers');
-      const playingTime = getTextContent(item, 'playingtime');
-      const minPlaytime = getTextContent(item, 'minplaytime');
-      const maxPlaytime = getTextContent(item, 'maxplaytime');
-      const minAge = getTextContent(item, 'minage');
+      // ALLE Namen extrahieren (primary + alternate)
+      const allNames = Array.from(item.querySelectorAll('name')).map(nameEl => ({
+        value: nameEl.getAttribute('value'),
+        type: nameEl.getAttribute('type'),
+        sortindex: nameEl.getAttribute('sortindex')
+      }));
+      const primaryName = allNames.find(n => n.type === 'primary')?.value || allNames[0]?.value;
+      
+      // Basis-Informationen - WICHTIG: Diese Felder haben "value" Attribute, nicht Text-Content!
+      const yearPublished = getAttribute(item, 'yearpublished', 'value');
+      const minPlayers = getAttribute(item, 'minplayers', 'value');
+      const maxPlayers = getAttribute(item, 'maxplayers', 'value');
+      const playingTime = getAttribute(item, 'playingtime', 'value');
+      const minPlaytime = getAttribute(item, 'minplaytime', 'value');
+      const maxPlaytime = getAttribute(item, 'maxplaytime', 'value');
+      const minAge = getAttribute(item, 'minage', 'value');
       const description = getTextContent(item, 'description');
+      
+      // Bilder
+      const thumbnail = getTextContent(item, 'thumbnail');
+      const image = getTextContent(item, 'image');
 
       // Publisher und Designer
       const publishers = Array.from(item.querySelectorAll('link[type="boardgamepublisher"]'))
-        .map(link => link.getAttribute('value'));
+        .map(link => ({ id: link.getAttribute('id'), name: link.getAttribute('value') }));
       const designers = Array.from(item.querySelectorAll('link[type="boardgamedesigner"]'))
-        .map(link => link.getAttribute('value'));
+        .map(link => ({ id: link.getAttribute('id'), name: link.getAttribute('value') }));
+      
+      // Categories, Mechanics, Families
+      const categories = Array.from(item.querySelectorAll('link[type="boardgamecategory"]'))
+        .map(link => ({ id: link.getAttribute('id'), name: link.getAttribute('value') }));
+      const mechanics = Array.from(item.querySelectorAll('link[type="boardgamemechanic"]'))
+        .map(link => ({ id: link.getAttribute('id'), name: link.getAttribute('value') }));
+      const families = Array.from(item.querySelectorAll('link[type="boardgamefamily"]'))
+        .map(link => ({ id: link.getAttribute('id'), name: link.getAttribute('value') }));
 
       // Statistiken
       const stats = item.querySelector('statistics ratings');
       const averageRating = stats ? getTextContent(stats, 'average') : '0';
+      const bayesAverage = stats ? getTextContent(stats, 'bayesaverage') : '0';
       const usersRated = stats ? getTextContent(stats, 'usersrated') : '0';
       const averageWeight = stats ? getTextContent(stats, 'averageweight') : '0';
+      const stdDev = stats ? getTextContent(stats, 'stddev') : '0';
+      const median = stats ? getTextContent(stats, 'median') : '0';
+      const owned = stats ? getTextContent(stats, 'owned') : '0';
+      const trading = stats ? getTextContent(stats, 'trading') : '0';
+      const wanting = stats ? getTextContent(stats, 'wanting') : '0';
+      const wishing = stats ? getTextContent(stats, 'wishing') : '0';
+      const numComments = stats ? getTextContent(stats, 'numcomments') : '0';
+      const numWeights = stats ? getTextContent(stats, 'numweights') : '0';
       
       // Ranking
       const ranks = Array.from(item.querySelectorAll('rank'));
@@ -167,12 +195,23 @@ class BGGService {
       // Empfohlene Spielerzahl (Poll-Daten)
       const playerPoll = item.querySelector('poll[name="suggested_numplayers"]');
       const bestPlayers = this._parseBestPlayerCount(playerPoll);
+      
+      // Language Dependence Poll
+      const langPoll = item.querySelector('poll[name="language_dependence"]');
+      const langDependence = this._parseLanguageDependence(langPoll);
 
       return {
         id: item.getAttribute('id'),
-        name: primaryName,
+        
+        // Alle Namen für Auswahl
+        names: allNames,
+        primaryName: primaryName,
+        
+        // Basis-Daten
         yearPublished: parseInt(yearPublished) || null,
         description: description,
+        thumbnail: thumbnail,
+        image: image,
         
         // Spieleranzahl & Zeit
         minPlayers: parseInt(minPlayers) || null,
@@ -182,18 +221,37 @@ class BGGService {
         playingTime: parseInt(playingTime) || null,
         minAge: parseInt(minAge) || null,
         
-        // Autoren & Verlage
-        designers: designers.join(', '),
-        publishers: publishers.join(', '),
+        // Autoren & Verlage (mit IDs für Auswahl)
+        designers: designers,
+        publishers: publishers,
         
-        // Bewertungen
+        // Kategorien, Mechaniken, Familien (für Multiselect)
+        categories: categories,
+        mechanics: mechanics,
+        families: families,
+        
+        // Bewertungen & Statistiken
         bgg_rating: parseFloat(averageRating) || 0,
+        bayesAverage: parseFloat(bayesAverage) || 0,
         usersRated: parseInt(usersRated) || 0,
         complexity: parseFloat(averageWeight) || 0,
+        stdDev: parseFloat(stdDev) || 0,
+        median: parseFloat(median) || 0,
         rank: rank !== 'Not Ranked' ? parseInt(rank) : null,
         
-        // Empfehlungen
-        bestPlayerCount: bestPlayers
+        // Ownership Stats
+        owned: parseInt(owned) || 0,
+        trading: parseInt(trading) || 0,
+        wanting: parseInt(wanting) || 0,
+        wishing: parseInt(wishing) || 0,
+        
+        // Community Daten
+        numComments: parseInt(numComments) || 0,
+        numWeights: parseInt(numWeights) || 0,
+        
+        // Empfehlungen & Polls
+        bestPlayerCount: bestPlayers,
+        languageDependence: langDependence
       };
     });
   }
@@ -223,37 +281,53 @@ class BGGService {
   /**
    * Importiere ein Spiel aus BGG in dein lokales Format
    * @param {number|string} gameId - BGG ID
-   * @returns {Promise<Object>} Spiel im Datenbank-Format
+   * @returns {Promise<Object>} Spiel mit allen Daten für Benutzerauswahl
    */
   async importGame(gameId) {
     const bggGame = await this.getGameDetails(gameId);
     
     // Konvertiere BGG-Daten direkt ins Datenbank-Schema-Format
+    // Gibt Objekt mit allen Optionen zurück, damit User auswählen kann
     return {
-      titel: bggGame.name,
-      verlag: bggGame.publishers,
-      autor: bggGame.designers,
-      bgg_id: parseInt(bggGame.id),
-      min_spieler: bggGame.minPlayers,
-      max_spieler: bggGame.maxPlayers,
-      optimale_spieleranzahl: bggGame.bestPlayerCount || null,
-      min_spielzeit: bggGame.minPlaytime,
-      max_spielzeit: bggGame.maxPlaytime,
-      spass: Math.round(bggGame.bgg_rating), // 0-10
-      strategie: Math.round(bggGame.complexity * 2), // 0-5 → 0-10
-      glueck: 5, // Default, manuell anpassen
-      komplexitaet: Math.round(bggGame.complexity),
-      bgg_rating: parseFloat(bggGame.bgg_rating.toFixed(1)),
-      altersempfehlung: bggGame.minAge,
-      awards: '', // Manuell ergänzen
-      status: 'Im Besitz',
-      standort: '', // Manuell ergänzen
-      fehlteile: false,
-      anschaffungsdatum: new Date().toISOString().split('T')[0],
-      info: bggGame.description ? bggGame.description.substring(0, 200) + '...' : '',
-      rohrstrat: Math.round(bggGame.complexity), // Als Integer
-      erweiterungenInBesitz: [],
-      erweiterungenZurAnschaffung: []
+      // Original BGG-Daten für Auswahl
+      bggData: {
+        names: bggGame.names, // Alle Namen zur Auswahl (inkl. deutscher Namen)
+        categories: bggGame.categories,
+        mechanics: bggGame.mechanics,
+        families: bggGame.families,
+        designers: bggGame.designers,
+        publishers: bggGame.publishers,
+        thumbnail: bggGame.thumbnail,
+        image: bggGame.image
+      },
+      
+      // Vorgeschlagene Datenbank-Werte (editierbar)
+      gameData: {
+        titel: bggGame.primaryName, // Default, kann user ändern
+        verlag: bggGame.publishers.map(p => p.name).join(', '),
+        autor: bggGame.designers.map(d => d.name).join(', '),
+        bgg_id: parseInt(bggGame.id),
+        min_spieler: bggGame.minPlayers,
+        max_spieler: bggGame.maxPlayers,
+        optimale_spieleranzahl: bggGame.bestPlayerCount || null,
+        min_spielzeit: bggGame.minPlaytime,
+        max_spielzeit: bggGame.maxPlaytime,
+        spass: Math.round(bggGame.bgg_rating), // 0-10
+        strategie: Math.round(bggGame.complexity * 2), // 0-5 → 0-10
+        glueck: 5, // Default, manuell anpassen
+        komplexitaet: parseFloat(bggGame.complexity.toFixed(1)), // numeric, nicht integer
+        bgg_rating: parseFloat(bggGame.bgg_rating.toFixed(1)),
+        altersempfehlung: bggGame.minAge,
+        awards: null, // Wird später manuell ergänzt
+        status: 'Im Besitz',
+        standort: '', // Manuell ergänzen
+        fehlteile: false,
+        anschaffungsdatum: new Date().toISOString().split('T')[0],
+        info: bggGame.description ? bggGame.description.substring(0, 200) + '...' : '',
+        rohrstrat: Math.round(bggGame.complexity), // Als Integer
+        erweiterungenInBesitz: [],
+        erweiterungenZurAnschaffung: []
+      }
     };
   }
 
@@ -280,6 +354,27 @@ class BGGService {
     });
 
     return bestCount;
+  }
+
+  /**
+   * Privat: Parse Language Dependence aus Poll-Daten
+   */
+  _parseLanguageDependence(pollElement) {
+    if (!pollElement) return null;
+
+    const results = Array.from(pollElement.querySelectorAll('result'));
+    let maxVotes = 0;
+    let dependence = 'Unknown';
+
+    results.forEach(result => {
+      const votes = parseInt(result.getAttribute('numvotes')) || 0;
+      if (votes > maxVotes) {
+        maxVotes = votes;
+        dependence = result.getAttribute('value');
+      }
+    });
+
+    return dependence;
   }
 
   /**

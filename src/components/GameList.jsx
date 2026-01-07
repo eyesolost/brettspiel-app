@@ -75,8 +75,13 @@ const GameList = () => {
         let aValue = a[sortConfig.key];
         let bValue = b[sortConfig.key];
 
-        // Spezielle Behandlung für verschiedene Datentypen
-        if (typeof aValue === 'string') {
+        // Spezielle Behandlung für Spieler und Spieldauer (min-Wert verwenden)
+        if (sortConfig.key === 'min_spieler' || sortConfig.key === 'min_spielzeit') {
+          aValue = a[sortConfig.key] || 0;
+          bValue = b[sortConfig.key] || 0;
+        }
+        // Normale Behandlung für andere Felder
+        else if (typeof aValue === 'string') {
           aValue = aValue.toLowerCase();
           bValue = bValue?.toLowerCase() || '';
         }
@@ -147,11 +152,11 @@ const GameList = () => {
                 <th onClick={() => handleSort('titel')}>
                   Titel {getSortIcon('titel')}
                 </th>
-                <th onClick={() => handleSort('minMaxSpieler')}>
-                  Spieler {getSortIcon('minMaxSpieler')}
+                <th onClick={() => handleSort('min_spieler')}>
+                  Spieler {getSortIcon('min_spieler')}
                 </th>
-                <th onClick={() => handleSort('minMaxSpielzeit')}>
-                  Spieldauer {getSortIcon('minMaxSpielzeit')}
+                <th onClick={() => handleSort('min_spielzeit')}>
+                  Spieldauer {getSortIcon('min_spielzeit')}
                 </th>
                 <th onClick={() => handleSort('status')}>
                   Status {getSortIcon('status')}

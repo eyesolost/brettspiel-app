@@ -43,6 +43,21 @@ const GameItem = ({ game, onDelete }) => {
     );
   };
 
+  const formatSpieler = () => {
+    const range = (game.min_spieler && game.max_spieler)
+      ? `${game.min_spieler} - ${game.max_spieler}`
+      : (game.min_spieler || game.max_spieler || '-');
+    const optimal = game.optimale_spieleranzahl ? ` (optimal: ${game.optimale_spieleranzahl})` : '';
+    return `${range}${optimal}`;
+  };
+
+  const formatSpieldauer = () => {
+    if (game.min_spielzeit && game.max_spielzeit) {
+      return `${game.min_spielzeit} - ${game.max_spielzeit}`;
+    }
+    return game.min_spielzeit || game.max_spielzeit || '-';
+  };
+
   return (
     <tr className="game-item">
       <td className="game-title">
@@ -53,8 +68,8 @@ const GameItem = ({ game, onDelete }) => {
           </span>
         )}
       </td>
-      <td>{game.minMaxSpieler}</td>
-      <td>{game.minMaxSpielzeit} min</td>
+      <td>{formatSpieler()}</td>
+      <td>{formatSpieldauer()} min</td>
       <td>
         <span className={`status-badge status-${game.status?.toLowerCase().replace(/\s/g, '-')}`}>
           {game.status}

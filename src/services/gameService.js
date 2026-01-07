@@ -20,6 +20,18 @@ export const createGame = async (gameData, forceCreate = false) => {
   try {
     const { erweiterungenInBesitz, erweiterungenZurAnschaffung, ...gameFields } = gameData
     
+    console.log('gameService - createGame - gameFields vor Insert:', {
+      min_spieler: gameFields.min_spieler,
+      max_spieler: gameFields.max_spieler,
+      min_spielzeit: gameFields.min_spielzeit,
+      max_spielzeit: gameFields.max_spielzeit,
+      komplexitaet: gameFields.komplexitaet,
+      bgg_rating: gameFields.bgg_rating,
+      altersempfehlung: gameFields.altersempfehlung,
+      awards: gameFields.awards,
+      alle_keys: Object.keys(gameFields)
+    });
+    
     // 🔍 Duplikatserkennung (nur wenn nicht forceCreate)
     if (!forceCreate) {
       const duplicateCheck = await checkForDuplicates(gameData)
@@ -49,6 +61,17 @@ export const createGame = async (gameData, forceCreate = false) => {
     }
     
     const game = insertedGames[0];
+    
+    console.log('gameService - createGame - game nach Insert:', {
+      min_spieler: game.min_spieler,
+      max_spieler: game.max_spieler,
+      min_spielzeit: game.min_spielzeit,
+      max_spielzeit: game.max_spielzeit,
+      komplexitaet: game.komplexitaet,
+      bgg_rating: game.bgg_rating,
+      altersempfehlung: game.altersempfehlung,
+      awards: game.awards
+    });
 
     // Insert extensions
     if (erweiterungenInBesitz?.length > 0) {

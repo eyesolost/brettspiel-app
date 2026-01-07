@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { bggService } from '../services/bggService';
 import { useGames } from '../context/GameContext';
-import { FaSearch, FaDownload, FaStar, FaSpinner } from 'react-icons/fa';
+import { FaSearch, FaDownload, FaStar, FaSpinner, FaCheck } from 'react-icons/fa';
 import '../styles/BGGImport.css';
 
 const BGGImport = () => {
@@ -14,6 +14,13 @@ const BGGImport = () => {
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(null);
   const [error, setError] = useState('');
+  
+  // Neuer State für Import-Dialog
+  const [importDialog, setImportDialog] = useState(null);
+  const [selectedTitle, setSelectedTitle] = useState('');
+  const [selectedPublisher, setSelectedPublisher] = useState('');
+  const [selectedCategories, setSelectedCategories] = useState([]);
+  const [selectedFamilies, setSelectedFamilies] = useState([]);
 
   const handleSearch = async (e) => {
     e.preventDefault();
@@ -43,23 +50,90 @@ const BGGImport = () => {
     setError('');
 
     try {
-      // Hole detaillierte Informationen von BGG
-      const importedGame = await bggService.importGame(gameId);
+      // Hole detaillierte Informationen von BGG (inkl. aller Namen, Categories etc.)
+      const importData = await bggService.importGame(gameId);
       
-      // Speichere in lokaler Datenbank
-      await addGame(importedGame);
+      // Finde deutschen Namen (falls vorhanden)
+      const germanName = importData.bggData.names.find(n => 
+        n.value.match(/[äöüßÄÖÜ]/) || // Hat deutsche Umlaute
+        n.type === 'alternate' // Oder ist alternativer Name
+      )?.value || importData.gameData.titel;
       
-      // Zeige Erfolgsmeldung
-      alert(`"${importedGame.titel}" wurde erfolgreich importiert!`);
-      
-      // Navigiere zur Übersicht
-      navigate('/');
+      // Öffne Import-Dialog mit Auswahloptionen
+      setImportDialog({
+        ...importData,
+        suggestedTitle: germanName
+      });
+      setSelectedTitle(germanName);
+      setSelectedPublisher(importData.bggData.publishers[0]?.name || '');
+      setSelectedCategories([]);
+      setSelectedFamilies([]);
     } catch (err) {
-      setError('Fehler beim Importieren. Bitte versuche es erneut.');
+      setError('Fehler beim Laden der Spieldetails. Bitte versuche es erneut.');
       console.error('BGG Import Error:', err);
     } finally {
       setImporting(null);
     }
+  };
+  
+  const handleConfirmImport = async () => {
+    if (!importDialog) return;
+    
+    try {
+      // Erstelle finales Spiel-Objekt mit Benutzerauswahl
+      const finalGame = {
+        ...importDialog.gameData,
+        titel: selectedTitle,
+        verlag: selectedPublisher,
+        // Optional: Kategorien & Families in Info-Feld anhängen
+        info: [
+          importDialog.gameData.info,
+          selectedCategories.length > 0 ? `\n\nKategorien: ${selectedCategories.join(', ')}` : '',
+          selectedFamilies.length > 0 ? `\nFamilien: ${selectedFamilies.join(', ')}` : ''
+        ].filter(Boolean).join('')
+      };
+      
+      console.log('BGGImport - finalGame vor addGame:', {
+        min_spieler: finalGame.min_spieler,
+        max_spieler: finalGame.max_spieler,
+        min_spielzeit: finalGame.min_spielzeit,
+        max_spielzeit: finalGame.max_spielzeit,
+        komplexitaet: finalGame.komplexitaet,
+        bgg_rating: finalGame.bgg_rating,
+        altersempfehlung: finalGame.altersempfehlung,
+        awards: finalGame.awards,
+        all_keys: Object.keys(finalGame)
+      });
+      
+      // Speichere in lokaler Datenbank
+      await addGame(finalGame);
+      
+      // Zeige Erfolgsmeldung
+      alert(`"${finalGame.titel}" wurde erfolgreich importiert!`);
+      
+      // Schließe Dialog und navigiere zur Übersicht
+      setImportDialog(null);
+      navigate('/');
+    } catch (err) {
+      setError('Fehler beim Speichern. Bitte versuche es erneut.');
+      console.error('Save Error:', err);
+    }
+  };
+
+  const toggleCategory = (categoryName) => {
+    setSelectedCategories(prev => 
+      prev.includes(categoryName)
+        ? prev.filter(c => c !== categoryName)
+        : [...prev, categoryName]
+    );
+  };
+
+  const toggleFamily = (familyName) => {
+    setSelectedFamilies(prev => 
+      prev.includes(familyName)
+        ? prev.filter(f => f !== familyName)
+        : [...prev, familyName]
+    );
   };
 
   const handleQuickImport = async () => {
@@ -123,7 +197,7 @@ const BGGImport = () => {
         )}
 
         {/* Suchergebnisse */}
-        {searchResults.length > 0 && (
+        {searchResults.length > 0 && !importDialog && (
           <div className="results-section">
             <h2>Suchergebnisse ({searchResults.length})</h2>
             <div className="results-grid">
@@ -154,7 +228,7 @@ const BGGImport = () => {
                     {importing === game.id ? (
                       <>
                         <FaSpinner className="spinner-icon" />
-                        Importiere...
+                        Lade...
                       </>
                     ) : (
                       <>
@@ -168,6 +242,130 @@ const BGGImport = () => {
             </div>
           </div>
         )}
+        
+        {/* Import-Dialog mit Auswahloptionen */}
+        {importDialog && (
+          <div className="import-dialog-overlay">
+            <div className="import-dialog">
+              <h2>🎲 Spiel importieren - Optionen wählen</h2>
+              
+              {/* Titel-Auswahl */}
+              <div className="dialog-section">
+                <h3>Titel wählen:</h3>
+                <select 
+                  className="dialog-select"
+                  value={selectedTitle}
+                  onChange={(e) => setSelectedTitle(e.target.value)}
+                >
+                  {importDialog.bggData.names.map((name, index) => (
+                    <option key={index} value={name.value}>
+                      {name.value}
+                      {name.type === 'primary' ? ' (Primary)' : ''}
+                      {name.value.match(/[äöüßÄÖÜ]/) ? ' 🇩🇪' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              {/* Verlag-Auswahl */}
+              {importDialog.bggData.publishers.length > 0 && (
+                <div className="dialog-section">
+                  <h3>Verlag wählen:</h3>
+                  <select 
+                    className="dialog-select"
+                    value={selectedPublisher}
+                    onChange={(e) => setSelectedPublisher(e.target.value)}
+                  >
+                    {importDialog.bggData.publishers.map((pub, idx) => (
+                      <option key={`pub-${idx}`} value={pub.name}>
+                        {pub.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              
+              {/* Categories Multiselect */}
+              {importDialog.bggData.categories.length > 0 && (
+                <div className="dialog-section">
+                  <h3>Kategorien wählen (optional):</h3>
+                  <div className="multiselect-options">
+                    {importDialog.bggData.categories.map((cat) => (
+                      <label key={cat.id} className="checkbox-option">
+                        <input
+                          type="checkbox"
+                          checked={selectedCategories.includes(cat.name)}
+                          onChange={() => toggleCategory(cat.name)}
+                        />
+                        <span>{cat.name}</span>
+                        {selectedCategories.includes(cat.name) && <FaCheck className="check-icon" />}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Families Multiselect */}
+              {importDialog.bggData.families.length > 0 && (
+                <div className="dialog-section">
+                  <h3>Familien wählen (optional):</h3>
+                  <div className="multiselect-options">
+                    {importDialog.bggData.families.slice(0, 10).map((fam) => (
+                      <label key={fam.id} className="checkbox-option">
+                        <input
+                          type="checkbox"
+                          checked={selectedFamilies.includes(fam.name)}
+                          onChange={() => toggleFamily(fam.name)}
+                        />
+                        <span>{fam.name}</span>
+                        {selectedFamilies.includes(fam.name) && <FaCheck className="check-icon" />}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Vorschau */}
+              <div className="dialog-section preview-section">
+                <h3>Vorschau:</h3>
+                <div className="preview-info">
+                  <p><strong>Titel:</strong> {selectedTitle}</p>
+                  <p><strong>Autor:</strong> {importDialog.gameData.autor}</p>
+                  <p><strong>Verlag:</strong> {selectedPublisher}</p>
+                  <p><strong>Spieler:</strong> {importDialog.gameData.min_spieler} - {importDialog.gameData.max_spieler}</p>
+                  <p><strong>Spieldauer:</strong> {importDialog.gameData.min_spielzeit} - {importDialog.gameData.max_spielzeit} Min.</p>
+                  <p><strong>BGG Rating:</strong> {importDialog.gameData.bgg_rating}/10</p>
+                  <p><strong>Komplexität:</strong> {importDialog.gameData.komplexitaet}/5</p>
+                  <p><strong>Strategie:</strong> {importDialog.gameData.strategie}/10</p>
+                  <p><strong>Spaß:</strong> {importDialog.gameData.spass}/10</p>
+                  <p><strong>Glück:</strong> {importDialog.gameData.glueck}/10</p>
+                  {selectedCategories.length > 0 && (
+                    <p><strong>Kategorien:</strong> {selectedCategories.join(', ')}</p>
+                  )}
+                  {selectedFamilies.length > 0 && (
+                    <p><strong>Familien:</strong> {selectedFamilies.join(', ')}</p>
+                  )}
+                </div>
+              </div>
+              
+              {/* Buttons */}
+              <div className="dialog-actions">
+                <button 
+                  onClick={() => setImportDialog(null)} 
+                  className="btn btn-secondary"
+                >
+                  Abbrechen
+                </button>
+                <button 
+                  onClick={handleConfirmImport} 
+                  className="btn btn-primary"
+                >
+                  <FaDownload /> Import bestätigen
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Info-Box */}
         <div className="info-box">
@@ -178,12 +376,16 @@ const BGGImport = () => {
               Bitte habe etwas Geduld beim Importieren.
             </li>
             <li>
-              <strong>Automatisch gefüllt:</strong> Titel, Autor, Verlag, Spieleranzahl, 
-              Spieldauer, BGG-Rating, Komplexität, Altersempfehlung
+              <strong>Titelauswahl:</strong> Wähle zwischen verschiedenen Sprachversionen 
+              (deutsche Titel werden automatisch hervorgehoben)
             </li>
             <li>
-              <strong>Manuell ergänzen:</strong> Standort, Erweiterungen, Fehlteile, 
-              Awards, persönliche Bewertungen
+              <strong>Kategorien & Familien:</strong> Wähle relevante Tags aus, 
+              um deine Sammlung besser zu organisieren
+            </li>
+            <li>
+              <strong>Automatisch gefüllt:</strong> Titel, Autor, Verlag, Spieleranzahl, 
+              Spieldauer, BGG-Rating, Komplexität, Altersempfehlung
             </li>
             <li>
               <strong>Bearbeitung:</strong> Nach dem Import kannst du alle Felder 
