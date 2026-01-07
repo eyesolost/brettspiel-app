@@ -174,18 +174,18 @@ class BGGService {
 
       // Statistiken
       const stats = item.querySelector('statistics ratings');
-      const averageRating = stats ? getTextContent(stats, 'average') : '0';
-      const bayesAverage = stats ? getTextContent(stats, 'bayesaverage') : '0';
-      const usersRated = stats ? getTextContent(stats, 'usersrated') : '0';
-      const averageWeight = stats ? getTextContent(stats, 'averageweight') : '0';
-      const stdDev = stats ? getTextContent(stats, 'stddev') : '0';
-      const median = stats ? getTextContent(stats, 'median') : '0';
-      const owned = stats ? getTextContent(stats, 'owned') : '0';
-      const trading = stats ? getTextContent(stats, 'trading') : '0';
-      const wanting = stats ? getTextContent(stats, 'wanting') : '0';
-      const wishing = stats ? getTextContent(stats, 'wishing') : '0';
-      const numComments = stats ? getTextContent(stats, 'numcomments') : '0';
-      const numWeights = stats ? getTextContent(stats, 'numweights') : '0';
+      const averageRating = stats ? getAttribute(stats, 'average', 'value') : '0';
+      const bayesAverage = stats ? getAttribute(stats, 'bayesaverage', 'value') : '0';
+      const usersRated = stats ? getAttribute(stats, 'usersrated', 'value') : '0';
+      const averageWeight = stats ? getAttribute(stats, 'averageweight', 'value') : '0';
+      const stdDev = stats ? getAttribute(stats, 'stddev', 'value') : '0';
+      const median = stats ? getAttribute(stats, 'median', 'value') : '0';
+      const owned = stats ? getAttribute(stats, 'owned', 'value') : '0';
+      const trading = stats ? getAttribute(stats, 'trading', 'value') : '0';
+      const wanting = stats ? getAttribute(stats, 'wanting', 'value') : '0';
+      const wishing = stats ? getAttribute(stats, 'wishing', 'value') : '0';
+      const numComments = stats ? getAttribute(stats, 'numcomments', 'value') : '0';
+      const numWeights = stats ? getAttribute(stats, 'numweights', 'value') : '0';
       
       // Ranking
       const ranks = Array.from(item.querySelectorAll('rank'));
