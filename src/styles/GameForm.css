@@ -39,6 +39,14 @@
   border-bottom: 2px solid var(--border-color);
 }
 
+.section-hint {
+  font-size: 13px;
+  color: #666;
+  font-style: italic;
+  margin-bottom: 15px;
+  margin-top: -10px;
+}
+
 .form-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -261,6 +269,41 @@
   background-color: #e3f2fd;
   color: #1976d2;
   padding: 6px 8px;
+}
+
+.tag-extension {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+}
+
+.tag-extension-planned {
+  background-color: #fff3e0;
+  color: #e65100;
+}
+
+.tag.draggable {
+  cursor: grab;
+}
+
+.tag.draggable:active {
+  cursor: grabbing;
+}
+
+.drop-zone {
+  min-height: 60px;
+  border: 2px dashed transparent;
+  transition: border-color 0.2s, background-color 0.2s;
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.drop-zone:has(~ *) {
+  /* Nur aktiv wenn etwas gedragged wird */
+}
+
+.drop-zone.drag-over {
+  border-color: #2e7d32;
+  background-color: #f1f8f4;
 }
 
 .tag-content {

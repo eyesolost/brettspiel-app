@@ -36,10 +36,9 @@ const GameForm = ({ mode = 'add' }) => {
     optimaleSpieleranzahl: ''
   });
 
-  const [erweiterungInput, setErweiterungInput] = useState('');
-  const [anschaffungInput, setAnschaffungInput] = useState('');
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [allCategories, setAllCategories] = useState([]);
+  const [draggedExtension, setDraggedExtension] = useState(null);
 
   const reverseTransformFormData = (data) => {
     // Transform database schema back to form data
@@ -95,22 +94,58 @@ const GameForm = ({ mode = 'add' }) => {
     });
   };
 
-  const handleAddErweiterung = (type) => {
-    const input = type === 'besitz' ? erweiterungInput : anschaffungInput;
-    if (!input.trim()) return;
+  const handleDragStart = (e, extensionName, sourceType) => {
+    setDraggedExtension({ name: extensionName, source: sourceType });
+    e.dataTransfer.effectAllowed = 'move';
+  };
 
-    const field = type === 'besitz' ? 'erweiterungenInBesitz' : 'erweiterungenZurAnschaffung';
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = async (e, targetType) => {
+    e.preventDefault();
     
+    if (!draggedExtension || draggedExtension.source === targetType) {
+      setDraggedExtension(null);
+      return;
+    }
+
+    // Verschiebe Extension bidirektional
+    let newInBesitz = [...formData.erweiterungenInBesitz];
+    let newZurAnschaffung = [...formData.erweiterungenZurAnschaffung];
+
+    if (draggedExtension.source === 'besitz' && targetType === 'anschaffung') {
+      // Von "im Besitz" nach "zur Anschaffung"
+      newInBesitz = newInBesitz.filter(ext => ext !== draggedExtension.name);
+      newZurAnschaffung = [...newZurAnschaffung, draggedExtension.name];
+    } else if (draggedExtension.source === 'anschaffung' && targetType === 'besitz') {
+      // Von "zur Anschaffung" nach "im Besitz"
+      newZurAnschaffung = newZurAnschaffung.filter(ext => ext !== draggedExtension.name);
+      newInBesitz = [...newInBesitz, draggedExtension.name];
+    }
+
     setFormData({
       ...formData,
-      [field]: [...formData[field], input.trim()]
+      erweiterungenInBesitz: newInBesitz,
+      erweiterungenZurAnschaffung: newZurAnschaffung
     });
 
-    if (type === 'besitz') {
-      setErweiterungInput('');
-    } else {
-      setAnschaffungInput('');
+    // Wenn im Edit-Modus, direkt DB updaten
+    if (mode === 'edit' && id) {
+      try {
+        await updateGame(id, {
+          erweiterungenInBesitz: newInBesitz,
+          erweiterungenZurAnschaffung: newZurAnschaffung
+        });
+      } catch (error) {
+        console.error('Fehler beim Aktualisieren der Extensions:', error);
+        alert('Fehler beim Verschieben der Erweiterung.');
+      }
     }
+
+    setDraggedExtension(null);
   };
 
   const handleRemoveErweiterung = (type, index) => {
@@ -622,82 +657,71 @@ const GameForm = ({ mode = 'add' }) => {
 
         <div className="form-section">
           <h2>Erweiterungen</h2>
+          <p className="section-hint">Ziehe Erweiterungen zwischen den Bereichen, um den Status zu ändern.</p>
           
           <div className="form-group">
             <label>Erweiterungen im Besitz</label>
-            <div className="tag-input-container">
-              <input
-                type="text"
-                value={erweiterungInput}
-                onChange={(e) => setErweiterungInput(e.target.value)}
-                placeholder="Erweiterungsname eingeben..."
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleAddErweiterung('besitz');
-                  }
-                }}
-              />
-              <button
-                type="button"
-                onClick={() => handleAddErweiterung('besitz')}
-                className="btn-add-tag"
-              >
-                Hinzufügen
-              </button>
-            </div>
-            <div className="tags-list">
-              {formData.erweiterungenInBesitz.map((erw, index) => (
-                <span key={index} className="tag">
-                  {erw}
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveErweiterung('besitz', index)}
-                    className="tag-remove"
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
+            <div 
+              className="categories-section drop-zone"
+              onDragOver={handleDragOver}
+              onDrop={(e) => handleDrop(e, 'besitz')}
+            >
+              <div className="tags-list">
+                {formData.erweiterungenInBesitz.length === 0 ? (
+                  <p className="empty-state">Keine Erweiterungen im Besitz</p>
+                ) : (
+                  formData.erweiterungenInBesitz.map((erw, index) => (
+                    <span 
+                      key={index} 
+                      className="tag tag-extension draggable"
+                      draggable={true}
+                      onDragStart={(e) => handleDragStart(e, erw, 'besitz')}
+                    >
+                      {erw}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveErweiterung('besitz', index)}
+                        className="tag-remove"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))
+                )}
+              </div>
             </div>
           </div>
 
           <div className="form-group">
             <label>Erweiterungen zur Anschaffung</label>
-            <div className="tag-input-container">
-              <input
-                type="text"
-                value={anschaffungInput}
-                onChange={(e) => setAnschaffungInput(e.target.value)}
-                placeholder="Erweiterungsname eingeben..."
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleAddErweiterung('anschaffung');
-                  }
-                }}
-              />
-              <button
-                type="button"
-                onClick={() => handleAddErweiterung('anschaffung')}
-                className="btn-add-tag"
-              >
-                Hinzufügen
-              </button>
-            </div>
-            <div className="tags-list">
-              {formData.erweiterungenZurAnschaffung.map((erw, index) => (
-                <span key={index} className="tag tag-warning">
-                  {erw}
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveErweiterung('anschaffung', index)}
-                    className="tag-remove"
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
+            <div 
+              className="categories-section drop-zone"
+              onDragOver={handleDragOver}
+              onDrop={(e) => handleDrop(e, 'anschaffung')}
+            >
+              <div className="tags-list">
+                {formData.erweiterungenZurAnschaffung.length === 0 ? (
+                  <p className="empty-state">Keine Erweiterungen geplant</p>
+                ) : (
+                  formData.erweiterungenZurAnschaffung.map((erw, index) => (
+                    <span 
+                      key={index} 
+                      className="tag tag-extension-planned draggable"
+                      draggable={true}
+                      onDragStart={(e) => handleDragStart(e, erw, 'anschaffung')}
+                    >
+                      {erw}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveErweiterung('anschaffung', index)}
+                        className="tag-remove"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))
+                )}
+              </div>
             </div>
           </div>
         </div>
