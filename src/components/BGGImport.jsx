@@ -7,7 +7,7 @@ import '../styles/BGGImport.css';
 
 const BGGImport = () => {
   const navigate = useNavigate();
-  const { addGame } = useGames();
+  const { addGame, games } = useGames();
   
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -80,11 +80,22 @@ const BGGImport = () => {
     if (!importDialog) return;
     
     try {
+      // Expansions: Bestimme Besitz/Zur Anschaffung anhand vorhandener Spiele
+      const expansions = importDialog.bggData.expansions || [];
+      const ownedById = expansions.filter(exp => games.some(g => g.bgg_id === parseInt(exp.id))).map(exp => exp.name);
+      const ownedByTitle = expansions.filter(exp => games.some(g => (g.titel || '').toLowerCase() === exp.name.toLowerCase())).map(exp => exp.name);
+      const ownedSet = new Set([...ownedById, ...ownedByTitle]);
+      const allExpNames = expansions.map(exp => exp.name);
+      const erweiterungenInBesitz = Array.from(ownedSet);
+      const erweiterungenZurAnschaffung = allExpNames.filter(name => !ownedSet.has(name));
+
       // Erstelle finales Spiel-Objekt mit Benutzerauswahl
       const finalGame = {
         ...importDialog.gameData,
         titel: selectedTitle,
         verlag: selectedPublisher,
+        erweiterungenInBesitz,
+        erweiterungenZurAnschaffung,
         // Optional: Kategorien & Families in Info-Feld anhängen
         info: [
           importDialog.gameData.info,
@@ -105,7 +116,7 @@ const BGGImport = () => {
         all_keys: Object.keys(finalGame)
       });
       
-      // Speichere in lokaler Datenbank
+      // Speichere in lokaler Datenbank (Extensions werden im Service eingefügt)
       await addGame(finalGame);
       
       // Zeige Erfolgsmeldung
@@ -339,6 +350,9 @@ const BGGImport = () => {
                   <p><strong>Strategie:</strong> {importDialog.gameData.strategie}/10</p>
                   <p><strong>Spaß:</strong> {importDialog.gameData.spass}/10</p>
                   <p><strong>Glück:</strong> {importDialog.gameData.glueck}/10</p>
+                  {importDialog.bggData.expansions?.length > 0 && (
+                    <p><strong>Erweiterungen gefunden:</strong> {importDialog.bggData.expansions.length}</p>
+                  )}
                   {selectedCategories.length > 0 && (
                     <p><strong>Kategorien:</strong> {selectedCategories.join(', ')}</p>
                   )}

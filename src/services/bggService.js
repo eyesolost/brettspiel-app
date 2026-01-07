@@ -171,6 +171,9 @@ class BGGService {
         .map(link => ({ id: link.getAttribute('id'), name: link.getAttribute('value') }));
       const families = Array.from(item.querySelectorAll('link[type="boardgamefamily"]'))
         .map(link => ({ id: link.getAttribute('id'), name: link.getAttribute('value') }));
+      // Expansions (Erweiterungen)
+      const expansions = Array.from(item.querySelectorAll('link[type="boardgameexpansion"]'))
+        .map(link => ({ id: link.getAttribute('id'), name: link.getAttribute('value'), inbound: link.getAttribute('inbound') === 'true' }));
 
       // Statistiken
       const stats = item.querySelector('statistics ratings');
@@ -229,6 +232,7 @@ class BGGService {
         categories: categories,
         mechanics: mechanics,
         families: families,
+        expansions: expansions,
         
         // Bewertungen & Statistiken
         bgg_rating: parseFloat(averageRating) || 0,
@@ -295,6 +299,7 @@ class BGGService {
         categories: bggGame.categories,
         mechanics: bggGame.mechanics,
         families: bggGame.families,
+        expansions: bggGame.expansions,
         designers: bggGame.designers,
         publishers: bggGame.publishers,
         thumbnail: bggGame.thumbnail,
